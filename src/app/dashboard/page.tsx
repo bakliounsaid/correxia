@@ -1,4 +1,14 @@
-import { AlertCircle, CheckCircle2, Clock, Upload, Eye } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Upload,
+  Eye,
+  GraduationCap,
+  CircleUserRound,
+  School,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { subjectLabelFr } from "@/lib/dashboard-profile";
@@ -87,6 +97,181 @@ function normalizeDashboardCopyRow(raw: {
 }
 
 export default async function DashboardPage() {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: currentUser } = user
+    ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
+
+  if (user && currentUser?.role === "school_admin") {
+    const { data: school } = await supabase
+      .from("schools")
+      .select("id, name, city")
+      .eq("admin_user_id", user.id)
+      .maybeSingle();
+
+    const schoolId = school?.id ?? null;
+    const [
+      teachersCountRes,
+      studentsCountRes,
+      classesRes,
+      recentTeachersRes,
+      recentStudentsRes,
+    ] = schoolId
+      ? await Promise.all([
+          supabase
+            .from("teachers")
+            .select("id, users!inner(role)", { count: "exact", head: true })
+            .eq("school_id", schoolId)
+            .eq("users.role", "teacher"),
+          supabase
+            .from("students")
+            .select("*", { count: "exact", head: true })
+            .eq("school_id", schoolId),
+          supabase
+            .from("students")
+            .select("class_name")
+            .eq("school_id", schoolId),
+          supabase
+            .from("teachers")
+            .select("id, subject, users!inner ( full_name, email, role )")
+            .eq("school_id", schoolId)
+            .eq("users.role", "teacher")
+            .order("created_at", { ascending: false })
+            .limit(6),
+          supabase
+            .from("students")
+            .select("id, first_name, last_name, class_name, created_at")
+            .eq("school_id", schoolId)
+            .order("created_at", { ascending: false })
+            .limit(6),
+        ])
+      : [null, null, null, null, null];
+
+    const classesCount = new Set(
+      (classesRes?.data ?? [])
+        .map((s) => s.class_name?.trim())
+        .filter((c): c is string => Boolean(c)),
+    ).size;
+
+    return (
+      <div className="p-8 lg:p-10">
+        <header className="mb-8 border-b border-gray-200 pb-6">
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+            Dashboard établissement
+          </h1>
+          <p className="mt-1 text-gray-500">
+            Suivi global de votre établissement : enseignants, élèves et classes.
+          </p>
+          <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary-50 px-3 py-2 text-sm text-primary-700">
+            <School className="h-4 w-4" />
+            {school?.name
+              ? `${school.name}${school.city ? ` — ${school.city}` : ""}`
+              : "Établissement non lié"}
+          </p>
+        </header>
+
+        <div className="mb-10 grid gap-4 sm:grid-cols-3">
+          {[
+            {
+              label: "Enseignants",
+              value: String(teachersCountRes?.count ?? 0),
+              icon: GraduationCap,
+              iconBg: "bg-ia-50",
+              iconColor: "text-ia-600",
+            },
+            {
+              label: "Élèves",
+              value: String(studentsCountRes?.count ?? 0),
+              icon: CircleUserRound,
+              iconBg: "bg-secondary-50",
+              iconColor: "text-secondary-600",
+            },
+            {
+              label: "Classes",
+              value: String(classesCount),
+              icon: Users,
+              iconBg: "bg-success-50",
+              iconColor: "text-success-600",
+            },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="rounded-xl border border-gray-100 bg-white p-6 shadow-card"
+            >
+              <div
+                className={cn(
+                  "mb-4 flex h-12 w-12 items-center justify-center rounded-full",
+                  s.iconBg,
+                )}
+              >
+                <s.icon className={cn("h-6 w-6", s.iconColor)} strokeWidth={2} />
+              </div>
+              <p className="text-3xl font-semibold text-gray-900">{s.value}</p>
+              <p className="mt-1 text-sm text-gray-500">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-card">
+            <div className="border-b border-gray-100 px-6 py-4">
+              <h2 className="text-base font-semibold text-gray-900">
+                Enseignants récents
+              </h2>
+            </div>
+            <div className="px-6 py-4 text-sm text-gray-600">
+              {(recentTeachersRes?.data ?? []).length === 0 ? (
+                "Aucun enseignant rattaché pour le moment."
+              ) : (
+                <ul className="space-y-2">
+                  {(recentTeachersRes?.data ?? []).map((t) => {
+                    const u = normalizeRelationOne<{ full_name: string; email: string }>(
+                      t.users as { full_name: string; email: string } | { full_name: string; email: string }[] | null,
+                    );
+                    const name = u?.full_name?.trim() || u?.email || "Utilisateur";
+                    return (
+                      <li key={t.id} className="flex items-center justify-between">
+                        <span>{name}</span>
+                        <span className="text-xs text-gray-500">
+                          {subjectLabelFr(t.subject)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-card">
+            <div className="border-b border-gray-100 px-6 py-4">
+              <h2 className="text-base font-semibold text-gray-900">Élèves récents</h2>
+            </div>
+            <div className="px-6 py-4 text-sm text-gray-600">
+              {(recentStudentsRes?.data ?? []).length === 0 ? (
+                "Aucun élève rattaché pour le moment."
+              ) : (
+                <ul className="space-y-2">
+                  {(recentStudentsRes?.data ?? []).map((s) => (
+                    <li key={s.id} className="flex items-center justify-between">
+                      <span>{`${s.first_name} ${s.last_name}`.trim()}</span>
+                      <span className="text-xs text-gray-500">
+                        {s.class_name?.trim() || "Sans classe"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const teacherId = await getTeacherId();
 
   let countACorriger = 0;
@@ -95,7 +280,6 @@ export default async function DashboardPage() {
   let rows: CopyRow[] = [];
 
   if (teacherId) {
-    const supabase = createSupabaseServerClient();
     const [aCorriger, enCours, terminees, copiesRes] = await Promise.all([
       supabase
         .from("test_copies")

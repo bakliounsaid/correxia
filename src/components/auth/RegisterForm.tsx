@@ -24,6 +24,8 @@ import {
 import { cn } from "@/lib/utils";
 
 type RegFieldErrors = Partial<{
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   confirm: string;
@@ -72,6 +74,12 @@ function RegisterFormInner() {
 
   function validateFields(): boolean {
     const next: RegFieldErrors = {};
+    if (!firstName.trim()) {
+      next.firstName = USER_MESSAGES.fieldRequired;
+    }
+    if (!lastName.trim()) {
+      next.lastName = USER_MESSAGES.fieldRequired;
+    }
     if (!email.trim()) {
       next.email = USER_MESSAGES.fieldRequired;
     } else if (!isValidEmail(email)) {
@@ -86,6 +94,9 @@ function RegisterFormInner() {
       next.confirm = USER_MESSAGES.fieldRequired;
     } else if (password !== confirm) {
       next.confirm = USER_MESSAGES.passwordConfirmMismatch;
+    }
+    if (!subject.trim()) {
+      next.subject = USER_MESSAGES.fieldRequired;
     }
     setFieldErrors(next);
     return Object.keys(next).length === 0;
@@ -171,11 +182,22 @@ function RegisterFormInner() {
               name="firstName"
               autoComplete="given-name"
               value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
+              onChange={(e) => {
+                setFirstName(e.target.value);
+                setFieldErrors((f) => ({ ...f, firstName: undefined }));
+              }}
               placeholder="Jean"
-              className={cn(inputBase, "border-transparent pl-10 pr-3")}
+              aria-invalid={Boolean(fieldErrors.firstName)}
+              className={cn(
+                inputBase,
+                "pl-10 pr-3",
+                fieldErrors.firstName
+                  ? "border-error-400 ring-2 ring-error-200"
+                  : "border-transparent",
+              )}
             />
           </div>
+          <FieldError message={fieldErrors.firstName} />
         </div>
         <div>
           <label
@@ -189,10 +211,21 @@ function RegisterFormInner() {
             name="lastName"
             autoComplete="family-name"
             value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
+            onChange={(e) => {
+              setLastName(e.target.value);
+              setFieldErrors((f) => ({ ...f, lastName: undefined }));
+            }}
             placeholder="Dupont"
-            className={cn(inputBase, "border-transparent px-4")}
+            aria-invalid={Boolean(fieldErrors.lastName)}
+            className={cn(
+              inputBase,
+              "px-4",
+              fieldErrors.lastName
+                ? "border-error-400 ring-2 ring-error-200"
+                : "border-transparent",
+            )}
           />
+          <FieldError message={fieldErrors.lastName} />
         </div>
       </div>
       <div>

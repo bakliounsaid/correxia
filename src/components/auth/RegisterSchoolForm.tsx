@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowRight, Building2, Lock, Mail, MapPin, Phone } from "lucide-react";
 import { ACCOUNT_TYPE } from "@/lib/account-types";
-import { AlertMessage } from "@/components/ui/AlertMessage";
+import { AlertMessage, type AlertVariant } from "@/components/ui/AlertMessage";
 import { FieldError } from "@/components/ui/FieldError";
 import { mapApiError } from "@/lib/api-errors";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
@@ -23,9 +23,11 @@ type SchoolField =
   | "postal"
   | "address"
   | "phone"
-  | "password";
+  | "password"
+  | "confirm";
 
 type SchoolFieldErrors = Partial<Record<SchoolField, string>>;
+type FlashMessage = { variant: AlertVariant; message: string } | null;
 
 const inputBase =
   "w-full rounded-xl border bg-gray-50 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary-500";
@@ -39,9 +41,11 @@ export function RegisterSchoolForm() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [fieldErrors, setFieldErrors] = useState<SchoolFieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [flash, setFlash] = useState<FlashMessage>(null);
   const [loading, setLoading] = useState(false);
 
   const supabaseReady = useMemo(() => {
@@ -52,6 +56,16 @@ export function RegisterSchoolForm() {
       return false;
     }
   }, []);
+
+  useEffect(() => {
+    if (!flash) return;
+    const timer = window.setTimeout(() => setFlash(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [flash]);
+
+  function pushFlash(variant: AlertVariant, message: string) {
+    setFlash({ variant, message });
+  }
 
   function validateFields(): boolean {
     const next: SchoolFieldErrors = {};
@@ -70,6 +84,11 @@ export function RegisterSchoolForm() {
     } else if (password.length < 6) {
       next.password = USER_MESSAGES.passwordMinLength;
     }
+    if (!confirm) {
+      next.confirm = USER_MESSAGES.fieldRequired;
+    } else if (password !== confirm) {
+      next.confirm = USER_MESSAGES.passwordConfirmMismatch;
+    }
     setFieldErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -79,9 +98,13 @@ export function RegisterSchoolForm() {
     setError(null);
     setInfo(null);
     setFieldErrors({});
-    if (!validateFields()) return;
+    if (!validateFields()) {
+      pushFlash("warning", "Merci de corriger les champs indiqués.");
+      return;
+    }
     if (!supabaseReady) {
       setError(USER_MESSAGES.configSupabase);
+      pushFlash("error", USER_MESSAGES.configSupabase);
       return;
     }
 
@@ -110,11 +133,14 @@ export function RegisterSchoolForm() {
       });
 
       if (signErr) {
-        setError(mapAuthError(signErr.message, signErr.status));
+        const msg = mapAuthError(signErr.message, signErr.status);
+        setError(msg);
+        pushFlash("error", msg);
         return;
       }
 
       if (data.session) {
+        pushFlash("success", "Compte créé avec succès.");
         router.push("/dashboard");
         router.refresh();
         return;
@@ -122,12 +148,16 @@ export function RegisterSchoolForm() {
 
       if (data.user) {
         setInfo(USER_MESSAGES.signupCheckEmail);
+        pushFlash("success", USER_MESSAGES.signupCheckEmail);
         return;
       }
 
       setError(USER_MESSAGES.signupFailed);
+      pushFlash("error", USER_MESSAGES.signupFailed);
     } catch (err) {
-      setError(mapApiError(err));
+      const msg = mapApiError(err);
+      setError(msg);
+      pushFlash("error", msg);
     } finally {
       setLoading(false);
     }
@@ -142,6 +172,7 @@ export function RegisterSchoolForm() {
       {!supabaseReady && (
         <AlertMessage variant="warning">{USER_MESSAGES.configSupabase}</AlertMessage>
       )}
+      {flash && <AlertMessage variant={flash.variant}>{flash.message}</AlertMessage>}
       {error && <AlertMessage variant="error">{error}</AlertMessage>}
       {info && <AlertMessage variant="info">{info}</AlertMessage>}
 
@@ -333,7 +364,11 @@ export function RegisterSchoolForm() {
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);
-            clearField("password");
+            setFieldErrors((f) => ({
+              ...f,
+              password: undefined,
+              confirm: undefined,
+            }));
           }}
           autoComplete="new-password"
           aria-invalid={Boolean(fieldErrors.password)}
@@ -347,12 +382,44 @@ export function RegisterSchoolForm() {
         />
         <FieldError message={fieldErrors.password} />
       </div>
+      <div>
+        <label
+          htmlFor="school-confirm"
+          className="mb-1.5 block text-xs font-semibold text-gray-800"
+        >
+          Confirmer le mot de passe
+        </label>
+        <div className="relative">
+          <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            id="school-confirm"
+            name="confirm"
+            type="password"
+            value={confirm}
+            onChange={(e) => {
+              setConfirm(e.target.value);
+              clearField("confirm");
+            }}
+            autoComplete="new-password"
+            aria-invalid={Boolean(fieldErrors.confirm)}
+            className={cn(
+              inputBase,
+              "pl-10 pr-4",
+              fieldErrors.confirm
+                ? "border-error-400 ring-2 ring-error-200"
+                : "border-transparent",
+            )}
+          />
+        </div>
+        <FieldError message={fieldErrors.confirm} />
+      </div>
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-primary-500 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-500 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:pointer-events-none disabled:opacity-60"
       >
-        {loading ? "Création…" : "Créer l&apos;établissement"}
+        {loading ? "Création…" : "Créer mon compte"}
+        {!loading && <ArrowRight className="h-4 w-4" />}
       </button>
       <p className="text-center text-sm text-gray-600">
         <Link href="/login" className="text-primary-500 hover:text-primary-600">

@@ -16,16 +16,22 @@ const ACCENTS = [
 type StudentClassJoin = { class_name: string | null };
 
 export default async function ClassesPage() {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: currentUser } = user
+    ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const isSchoolAdmin = currentUser?.role === "school_admin";
   const teacherId = await getTeacherId();
   const teacher = await getTeacherRow();
 
-  if (!teacherId || !teacher) {
+  if ((!teacherId || !teacher) && !isSchoolAdmin) {
     return (
       <div className="p-8 lg:p-10">
         <header className="mb-4 border-b border-gray-200 pb-6">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
-            Mes classes
-          </h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Mes classes</h1>
           <p className="mt-1 text-gray-500">
             Regroupement par nom de classe (champ élève).
           </p>
@@ -40,17 +46,27 @@ export default async function ClassesPage() {
     );
   }
 
-  const supabase = createSupabaseServerClient();
+  let schoolId: string | null = null;
+  if (isSchoolAdmin && user) {
+    const { data: school } = await supabase
+      .from("schools")
+      .select("id")
+      .eq("admin_user_id", user.id)
+      .maybeSingle();
+    schoolId = school?.id ?? null;
+  }
 
-  const { data: students } = await supabase
-    .from("students")
-    .select("id, class_name")
-    .eq("teacher_id", teacherId);
+  const studentsQuery = supabase.from("students").select("id, class_name");
+  const { data: students } = isSchoolAdmin
+    ? await studentsQuery.eq("school_id", schoolId ?? "__none__")
+    : await studentsQuery.eq("teacher_id", teacherId!);
 
-  const { data: copies } = await supabase
+  const copiesQuery = supabase
     .from("test_copies")
-    .select("test_id, students(class_name)")
-    .eq("teacher_id", teacherId);
+    .select("test_id, students(class_name)");
+  const { data: copies } = isSchoolAdmin
+    ? await copiesQuery.eq("school_id", schoolId ?? "__none__")
+    : await copiesQuery.eq("teacher_id", teacherId!);
 
   const byClass = new Map<string, number>();
   for (const s of students ?? []) {
@@ -68,7 +84,7 @@ export default async function ClassesPage() {
     if (row.test_id) evalsByClass.get(label)!.add(row.test_id);
   }
 
-  const subject = subjectLabelFr(teacher.subject);
+  const subject = teacher ? subjectLabelFr(teacher.subject) : "Établissement";
 
   const classNames = Array.from(byClass.entries()).sort(([a], [b]) =>
     a.localeCompare(b),
@@ -78,11 +94,12 @@ export default async function ClassesPage() {
     <div className="p-8 lg:p-10">
       <header className="mb-6 border-b border-gray-200 pb-6">
         <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
-          Mes classes
+            {isSchoolAdmin ? "Classes établissement" : "Mes classes"}
         </h1>
         <p className="mt-1 text-gray-500">
-          Regroupement par nom de classe (champ élève). Ajoutez des élèves avec
-          une classe pour remplir cette vue.
+            {isSchoolAdmin
+              ? "Regroupement des élèves par classe pour l'établissement."
+              : "Regroupement par nom de classe (champ élève). Ajoutez des élèves avec une classe pour remplir cette vue."}
         </p>
       </header>
 

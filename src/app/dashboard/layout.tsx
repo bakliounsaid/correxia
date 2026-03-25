@@ -14,6 +14,7 @@ export default async function DashboardLayout({
         displayName={profile.displayName}
         subtitle={profile.subtitle}
         initials={profile.initials}
+        role={profile.role}
       />
       <main className="min-h-screen flex-1 overflow-auto">{children}</main>
     </div>

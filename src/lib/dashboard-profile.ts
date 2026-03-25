@@ -23,6 +23,7 @@ export type DashboardSidebarProfile = {
   displayName: string;
   subtitle: string;
   initials: string;
+  role: string;
 };
 
 /**
@@ -39,6 +40,24 @@ export async function getDashboardSidebarProfile(): Promise<DashboardSidebarProf
       displayName: "Invité",
       subtitle: "",
       initials: "?",
+      role: "guest",
+    };
+  }
+
+  const { data: row } = await supabase
+    .from("users")
+    .select("full_name, email, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (row?.role === "school_admin") {
+    const displayName =
+      row.full_name?.trim() || row.email || user.email || "Utilisateur";
+    return {
+      displayName,
+      subtitle: ROLE_LABEL.school_admin,
+      initials: adminInitials(row.full_name || "", row.email || user.email),
+      role: "school_admin",
     };
   }
 
@@ -61,14 +80,9 @@ export async function getDashboardSidebarProfile(): Promise<DashboardSidebarProf
       displayName,
       subtitle,
       initials: adminInitials(u.full_name || "", u.email || user.email),
+      role: "teacher",
     };
   }
-
-  const { data: row } = await supabase
-    .from("users")
-    .select("full_name, email, role")
-    .eq("id", user.id)
-    .maybeSingle();
 
   if (row) {
     const displayName =
@@ -78,6 +92,7 @@ export async function getDashboardSidebarProfile(): Promise<DashboardSidebarProf
       displayName,
       subtitle,
       initials: adminInitials(row.full_name || "", row.email || user.email),
+      role: row.role || "teacher",
     };
   }
 
@@ -90,5 +105,6 @@ export async function getDashboardSidebarProfile(): Promise<DashboardSidebarProf
     displayName,
     subtitle: "Compte",
     initials: adminInitials(fromMeta, user.email),
+    role: "teacher",
   };
 }

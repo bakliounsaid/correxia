@@ -60,6 +60,24 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (user && request.nextUrl.pathname.startsWith("/dashboard")) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const isSchoolAdmin = profile?.role === "school_admin";
+    if (
+      isSchoolAdmin &&
+      (request.nextUrl.pathname.startsWith("/dashboard/evaluations") ||
+        request.nextUrl.pathname.startsWith("/dashboard/archives") ||
+        request.nextUrl.pathname.startsWith("/dashboard/bareme"))
+    ) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  }
+
   return supabaseResponse;
 }
 

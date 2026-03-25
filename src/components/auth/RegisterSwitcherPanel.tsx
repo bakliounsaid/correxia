@@ -57,12 +57,6 @@ function RegisterSwitcherInner() {
           ? "Compte enseignant indépendant"
           : "Compte administrateur établissement"}
       </h2>
-      <p className="mt-1 text-sm text-gray-500">
-        {mode === "teacher"
-          ? "Packs B2C (Essentiel, Avancé, Maîtrise). Un compte = un prof."
-          : "Plan B2B : votre établissement et votre accès admin sont créés ensemble."}
-      </p>
-
       <div className="mt-6">
         {mode === "teacher" ? <RegisterForm /> : <RegisterSchoolForm />}
       </div>

@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   CircleUserRound,
+  GraduationCap,
   ClipboardList,
   Archive,
   SlidersHorizontal,
@@ -17,7 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
-const nav = [
+const teacherNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/classes", label: "Mes Classes", icon: Users },
   {
@@ -34,16 +35,25 @@ const nav = [
   },
 ];
 
+const schoolNav = [
+  { href: "/dashboard", label: "Dashboard établissement", icon: LayoutDashboard },
+  { href: "/dashboard/enseignants", label: "Enseignants", icon: GraduationCap },
+  { href: "/dashboard/eleves", label: "Élèves", icon: CircleUserRound },
+  { href: "/dashboard/classes", label: "Classes", icon: Users },
+];
+
 type Props = {
   displayName: string;
   subtitle: string;
   initials: string;
+  role?: string;
 };
 
-export function TeacherSidebar({ displayName, subtitle, initials }: Props) {
+export function TeacherSidebar({ displayName, subtitle, initials, role }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const nav = role === "school_admin" ? schoolNav : teacherNav;
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -65,7 +75,9 @@ export function TeacherSidebar({ displayName, subtitle, initials }: Props) {
           <p className="text-[15px] font-semibold tracking-tight text-gray-900">
             CORREXIA
           </p>
-          <p className="text-xs text-gray-500">Correction IA</p>
+          <p className="text-xs text-gray-500">
+            {role === "school_admin" ? "Pilotage établissement" : "Correction IA"}
+          </p>
         </div>
       </div>
 
