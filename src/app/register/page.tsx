@@ -50,8 +50,9 @@ export default function RegisterPage() {
           <RegisterSwitcherPanel />
         </div>
         <p className="mx-auto mt-8 max-w-lg text-center text-xs text-gray-500">
-          En créant un compte, vous acceptez nos Conditions d&apos;utilisation et
-          notre Politique de confidentialité
+          L’acceptation du traitement des données (case obligatoire dans le
+          formulaire) formalise votre consentement au RGPD. Consultez aussi nos
+          conditions d&apos;utilisation et notre politique de confidentialité.
         </p>
       </div>
     </div>

@@ -1,8 +1,6 @@
-import { Eye } from "lucide-react";
-import Link from "next/link";
+import { AdminEnseignantsTableClient } from "@/components/admin/AdminEnseignantsTableClient";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { normalizeRelationOne } from "@/lib/supabase-join";
-import { cn } from "@/lib/utils";
 
 type UserJoin = { full_name: string; email: string };
 
@@ -50,6 +48,30 @@ export default async function AdminEnseignantsPage() {
     ),
   }));
 
+  const clientRows = rows.map((r) => {
+    const u = r.users;
+    const fullName = u?.full_name ?? "—";
+    const email = u?.email ?? "—";
+    return {
+      id: r.id,
+      export: {
+        nom: fullName === "—" ? "" : fullName,
+        email: email === "—" ? "" : email,
+        matiere: r.subject,
+        plan: r.subscription_plan,
+        profil: r.is_independent ? "Indépendant" : "Établissement",
+        inscrit_le: formatDate(r.created_at),
+      },
+      fullName,
+      email,
+      subject: r.subject,
+      planLabel: r.subscription_plan,
+      planBadgeClass: planBadgeClass(r.subscription_plan),
+      profilLabel: r.is_independent ? "Indépendant" : "Établissement",
+      createdLabel: formatDate(r.created_at),
+    };
+  });
+
   return (
     <div className="p-8 lg:p-10">
       <header className="mb-8 border-b border-gray-200 pb-6">
@@ -68,88 +90,31 @@ export default async function AdminEnseignantsPage() {
         </p>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-card">
-        <div className="border-b border-gray-100 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900">
-            Liste des enseignants
-          </h2>
-          <p className="mt-0.5 text-sm text-gray-500">
-            {rows.length} profil{rows.length !== 1 ? "s" : ""}
-          </p>
+      {rows.length === 0 ? (
+        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-card">
+          <div className="border-b border-gray-100 px-6 py-4">
+            <h2 className="text-base font-semibold text-gray-900">
+              Liste des enseignants
+            </h2>
+            <p className="mt-0.5 text-sm text-gray-500">0 profil</p>
+          </div>
+          <p className="px-6 py-10 text-center text-sm text-gray-500">Aucun enseignant.</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-xs font-medium uppercase tracking-wide text-gray-500">
-                <th className="px-6 py-3">Nom</th>
-                <th className="px-6 py-3">Email</th>
-                <th className="px-6 py-3">Matière</th>
-                <th className="px-6 py-3">Plan</th>
-                <th className="px-6 py-3">Profil</th>
-                <th className="px-6 py-3">Inscrit le</th>
-                <th className="px-6 py-3">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-6 py-10 text-center text-gray-500"
-                  >
-                    Aucun enseignant.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((r) => {
-                  const u = r.users;
-                  return (
-                    <tr
-                      key={r.id}
-                      className="border-b border-gray-50 last:border-0"
-                    >
-                      <td className="px-6 py-4 font-medium text-gray-900">
-                        {u?.full_name ?? "—"}
-                      </td>
-                      <td className="max-w-[200px] truncate px-6 py-4 text-gray-600">
-                        {u?.email ?? "—"}
-                      </td>
-                      <td className="px-6 py-4 capitalize text-gray-600">
-                        {r.subject}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={cn(
-                            "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
-                            planBadgeClass(r.subscription_plan),
-                          )}
-                        >
-                          {r.subscription_plan}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {r.is_independent ? "Indépendant" : "Établissement"}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {formatDate(r.created_at)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <Link
-                          href="/admin/subscriptions"
-                          className="inline-flex items-center gap-1.5 rounded-full bg-primary-500 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-600"
-                        >
-                          <Eye className="h-3.5 w-3.5" strokeWidth={2} />
-                          Abonnements
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      ) : (
+        <AdminEnseignantsTableClient
+          rows={clientRows}
+          toolbarLeft={
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">
+                Liste des enseignants
+              </h2>
+              <p className="mt-0.5 text-sm text-gray-500">
+                {rows.length} profil{rows.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          }
+        />
+      )}
     </div>
   );
 }

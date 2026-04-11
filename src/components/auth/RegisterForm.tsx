@@ -7,11 +7,13 @@ import {
   ArrowRight,
   Building2,
   ChevronDown,
+  Loader2,
   Lock,
   Mail,
   User,
 } from "lucide-react";
 import { AlertMessage } from "@/components/ui/AlertMessage";
+import { RgpdConsentCheckbox } from "@/components/auth/RgpdConsentCheckbox";
 import { FieldError } from "@/components/ui/FieldError";
 import { ACCOUNT_TYPE } from "@/lib/account-types";
 import { mapApiError } from "@/lib/api-errors";
@@ -30,6 +32,7 @@ type RegFieldErrors = Partial<{
   password: string;
   confirm: string;
   subject: string;
+  rgpdConsent: string;
 }>;
 
 /** Valeurs alignées sur public.teachers.subject (CHECK math | physics | science) */
@@ -54,6 +57,7 @@ function RegisterFormInner() {
   const [subject, setSubject] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [rgpdAccepted, setRgpdAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<RegFieldErrors>({});
@@ -98,6 +102,9 @@ function RegisterFormInner() {
     if (!subject.trim()) {
       next.subject = USER_MESSAGES.fieldRequired;
     }
+    if (!rgpdAccepted) {
+      next.rgpdConsent = USER_MESSAGES.rgpdConsentRequired;
+    }
     setFieldErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -118,6 +125,7 @@ function RegisterFormInner() {
       const supabase = getSupabaseBrowserClient();
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
+      const rgpdAcceptedAt = new Date().toISOString();
       const { data, error: signErr } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -129,6 +137,8 @@ function RegisterFormInner() {
             last_name: lastName.trim() || undefined,
             school: school.trim() || undefined,
             subject: subject.trim(),
+            rgpd_consent: true,
+            rgpd_consent_at: rgpdAcceptedAt,
           },
         },
       });
@@ -291,6 +301,7 @@ function RegisterFormInner() {
             <select
               id="reg-subject"
               name="subject"
+              required
               value={subject}
               onChange={(e) => {
                 setSubject(e.target.value);
@@ -306,7 +317,7 @@ function RegisterFormInner() {
                 !subject && "text-gray-500",
               )}
             >
-              <option value="">Sélectionner une matière</option>
+              <option value="">Sélectionner la matière</option>
               {TEACHER_SUBJECT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -384,11 +395,22 @@ function RegisterFormInner() {
         </div>
         <FieldError message={fieldErrors.confirm} />
       </div>
+      <RgpdConsentCheckbox
+        id="reg-rgpd-consent"
+        checked={rgpdAccepted}
+        onCheckedChange={(v) => {
+          setRgpdAccepted(v);
+          setFieldErrors((f) => ({ ...f, rgpdConsent: undefined }));
+        }}
+        error={fieldErrors.rgpdConsent}
+      />
       <button
         type="submit"
         disabled={loading}
+        aria-busy={loading}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-500 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:pointer-events-none disabled:opacity-60"
       >
+        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
         {loading ? "Création…" : "Créer mon compte"}
         {!loading && <ArrowRight className="h-4 w-4" />}
       </button>

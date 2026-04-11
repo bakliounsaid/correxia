@@ -1,24 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Send } from "lucide-react";
+import { Loader2, Mail, Send } from "lucide-react";
 
 export function ContactSection() {
   const [sent, setSent] = useState(false);
+  const [pending, setPending] = useState(false);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = e.currentTarget;
-    const email = (form.elements.namedItem("email") as HTMLInputElement)?.value;
-    const subject = (form.elements.namedItem("subject") as HTMLSelectElement)?.value;
-    const message = (form.elements.namedItem("message") as HTMLTextAreaElement)?.value;
-    const name = (form.elements.namedItem("name") as HTMLInputElement)?.value;
+    setPending(true);
+    try {
+      const form = e.currentTarget;
+      const email = (form.elements.namedItem("email") as HTMLInputElement)?.value;
+      const subject = (form.elements.namedItem("subject") as HTMLSelectElement)?.value;
+      const message = (form.elements.namedItem("message") as HTMLTextAreaElement)?.value;
+      const name = (form.elements.namedItem("name") as HTMLInputElement)?.value;
 
-    const mailto = `mailto:contact@correxia.fr?subject=${encodeURIComponent(subject || "Contact CORREXIA")}&body=${encodeURIComponent(
-      `Nom : ${name || "—"}\nEmail : ${email || "—"}\n\nMessage :\n${message || ""}`,
-    )}`;
-    window.location.href = mailto;
-    setSent(true);
+      const mailto = `mailto:contact@correxia.fr?subject=${encodeURIComponent(subject || "Contact CORREXIA")}&body=${encodeURIComponent(
+        `Nom : ${name || "—"}\nEmail : ${email || "—"}\n\nMessage :\n${message || ""}`,
+      )}`;
+      window.location.href = mailto;
+      setSent(true);
+    } finally {
+      window.setTimeout(() => setPending(false), 1500);
+    }
   }
 
   return (
@@ -89,7 +95,7 @@ export function ContactSection() {
               required
               className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-500/20"
             >
-              <option value="">Choisir…</option>
+              <option value="">Sélectionner le sujet</option>
               <option value="Demande de démo établissement">
                 Demande de démo établissement
               </option>
@@ -119,10 +125,20 @@ export function ContactSection() {
           </div>
           <button
             type="submit"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-500 px-6 py-3.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-primary-600 hover:shadow-md active:scale-[0.98] sm:w-auto sm:px-8"
+            disabled={pending}
+            aria-busy={pending}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-500 px-6 py-3.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-primary-600 hover:shadow-md active:scale-[0.98] enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto sm:px-8"
           >
-            <Send className="h-4 w-4" />
-            {sent ? "Redirection vers votre client mail…" : "Envoyer"}
+            {pending ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 shrink-0" />
+            )}
+            {pending
+              ? "Ouverture du courrier…"
+              : sent
+                ? "Redirection vers votre client mail…"
+                : "Envoyer"}
           </button>
         </form>
 

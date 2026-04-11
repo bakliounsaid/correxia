@@ -1,4 +1,5 @@
-import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const variants = {
@@ -19,20 +20,41 @@ type Variant = keyof typeof variants;
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
+  loading?: boolean;
+  loadingText?: string;
+  loaderClassName?: string;
+  children: ReactNode;
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", type = "button", ...props }, ref) => (
+  (
+    {
+      className,
+      variant = "primary",
+      type = "button",
+      loading = false,
+      loadingText,
+      loaderClassName,
+      disabled,
+      children,
+      ...props
+    },
+    ref,
+  ) => (
     <button
       ref={ref}
       type={type}
+      disabled={disabled || loading}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed",
         variants[variant],
         className,
       )}
       {...props}
-    />
+    >
+      {loading && <Loader2 className={cn("h-4 w-4 animate-spin", loaderClassName)} />}
+      {loading && loadingText ? loadingText : children}
+    </button>
   ),
 );
 Button.displayName = "Button";

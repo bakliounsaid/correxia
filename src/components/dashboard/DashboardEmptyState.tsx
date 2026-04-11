@@ -21,7 +21,7 @@ export function DashboardEmptyState({
   children,
 }: Props) {
   return (
-    <div className="flex w-full items-center justify-center px-4 py-6 sm:py-10">
+    <div className="flex w-full items-start justify-center px-4 py-0">
       <article
         className={cn(
           "w-full max-w-2xl rounded-2xl border border-gray-200 border-t-4 bg-white px-6 py-14 text-center shadow-card sm:px-10 sm:py-20",

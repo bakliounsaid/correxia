@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Building2, Lock, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowRight, Building2, Loader2, Lock, Mail, MapPin, Phone } from "lucide-react";
 import { ACCOUNT_TYPE } from "@/lib/account-types";
+import { RgpdConsentCheckbox } from "@/components/auth/RgpdConsentCheckbox";
 import { AlertMessage, type AlertVariant } from "@/components/ui/AlertMessage";
 import { FieldError } from "@/components/ui/FieldError";
 import { mapApiError } from "@/lib/api-errors";
@@ -24,7 +25,8 @@ type SchoolField =
   | "address"
   | "phone"
   | "password"
-  | "confirm";
+  | "confirm"
+  | "rgpdConsent";
 
 type SchoolFieldErrors = Partial<Record<SchoolField, string>>;
 type FlashMessage = { variant: AlertVariant; message: string } | null;
@@ -42,6 +44,7 @@ export function RegisterSchoolForm() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [rgpdAccepted, setRgpdAccepted] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<SchoolFieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -89,6 +92,9 @@ export function RegisterSchoolForm() {
     } else if (password !== confirm) {
       next.confirm = USER_MESSAGES.passwordConfirmMismatch;
     }
+    if (!rgpdAccepted) {
+      next.rgpdConsent = USER_MESSAGES.rgpdConsentRequired;
+    }
     setFieldErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -113,6 +119,7 @@ export function RegisterSchoolForm() {
       const supabase = getSupabaseBrowserClient();
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
+      const rgpdAcceptedAt = new Date().toISOString();
       const { data, error: signErr } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -128,6 +135,8 @@ export function RegisterSchoolForm() {
             first_name: "Administrateur",
             last_name: schoolName.trim().slice(0, 200),
             subject: "math",
+            rgpd_consent: true,
+            rgpd_consent_at: rgpdAcceptedAt,
           },
         },
       });
@@ -413,11 +422,22 @@ export function RegisterSchoolForm() {
         </div>
         <FieldError message={fieldErrors.confirm} />
       </div>
+      <RgpdConsentCheckbox
+        id="school-rgpd-consent"
+        checked={rgpdAccepted}
+        onCheckedChange={(v) => {
+          setRgpdAccepted(v);
+          clearField("rgpdConsent");
+        }}
+        error={fieldErrors.rgpdConsent}
+      />
       <button
         type="submit"
         disabled={loading}
+        aria-busy={loading}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-500 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:pointer-events-none disabled:opacity-60"
       >
+        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
         {loading ? "Création…" : "Créer mon compte"}
         {!loading && <ArrowRight className="h-4 w-4" />}
       </button>

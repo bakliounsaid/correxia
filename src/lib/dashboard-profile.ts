@@ -24,6 +24,8 @@ export type DashboardSidebarProfile = {
   subtitle: string;
   initials: string;
   role: string;
+  /** Enseignant en compte libre : peut souscrire aux packs individuels (Avancé / Maîtrise). */
+  isIndependentTeacher: boolean;
 };
 
 /**
@@ -41,6 +43,7 @@ export async function getDashboardSidebarProfile(): Promise<DashboardSidebarProf
       subtitle: "",
       initials: "?",
       role: "guest",
+      isIndependentTeacher: false,
     };
   }
 
@@ -58,12 +61,13 @@ export async function getDashboardSidebarProfile(): Promise<DashboardSidebarProf
       subtitle: ROLE_LABEL.school_admin,
       initials: adminInitials(row.full_name || "", row.email || user.email),
       role: "school_admin",
+      isIndependentTeacher: false,
     };
   }
 
   const { data: teacher } = await supabase
     .from("teachers")
-    .select("subject, users ( full_name, email )")
+    .select("subject, is_independent, users ( full_name, email )")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -81,6 +85,7 @@ export async function getDashboardSidebarProfile(): Promise<DashboardSidebarProf
       subtitle,
       initials: adminInitials(u.full_name || "", u.email || user.email),
       role: "teacher",
+      isIndependentTeacher: teacher.is_independent === true,
     };
   }
 
@@ -93,6 +98,7 @@ export async function getDashboardSidebarProfile(): Promise<DashboardSidebarProf
       subtitle,
       initials: adminInitials(row.full_name || "", row.email || user.email),
       role: row.role || "teacher",
+      isIndependentTeacher: false,
     };
   }
 
@@ -106,5 +112,6 @@ export async function getDashboardSidebarProfile(): Promise<DashboardSidebarProf
     subtitle: "Compte",
     initials: adminInitials(fromMeta, user.email),
     role: "teacher",
+    isIndependentTeacher: false,
   };
 }

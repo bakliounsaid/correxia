@@ -121,14 +121,50 @@ class Student(Base):
     school_id = mapped_column(
         UUID(as_uuid=True), ForeignKey("schools.id", ondelete="CASCADE"), nullable=True
     )
-    teacher_id = mapped_column(
-        UUID(as_uuid=True), ForeignKey("teachers.id", ondelete="CASCADE")
+    class_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey("classes.id", ondelete="RESTRICT")
     )
     first_name = mapped_column(String(128), nullable=False)
     last_name = mapped_column(String(128), nullable=False)
-    email = mapped_column(String(320), nullable=True)
-    class_name = mapped_column(String(128), nullable=True)
-    is_active = mapped_column(Boolean, default=True)
+    id_interne = mapped_column(String(64), nullable=True)
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class Class(Base):
+    __tablename__ = "classes"
+
+    id = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    school_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey("schools.id", ondelete="CASCADE"), nullable=True
+    )
+    name = mapped_column(String(128), nullable=False)
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ClassTeacher(Base):
+    __tablename__ = "class_teachers"
+
+    id = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    class_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey("classes.id", ondelete="CASCADE")
+    )
+    teacher_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teachers.id", ondelete="CASCADE")
+    )
     created_at = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

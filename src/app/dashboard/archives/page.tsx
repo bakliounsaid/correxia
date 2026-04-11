@@ -1,5 +1,5 @@
-import { Eye, Download, Archive } from "lucide-react";
-import Link from "next/link";
+import { Archive } from "lucide-react";
+import { ArchivesTableClient } from "@/components/dashboard/ArchivesTableClient";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { subjectLabelFr } from "@/lib/dashboard-profile";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -41,6 +41,24 @@ export default async function ArchivesPage() {
     rows = (data ?? []) as ArchiveRow[];
   }
 
+  const archiveClientRows = rows.map((r) => ({
+    id: r.id,
+    export: {
+      titre: r.title,
+      matiere: subjectLabelFr(r.subject),
+      niveau: r.level,
+      cloturee_le: formatShortDate(r.updated_at),
+      copies: r.copies_generated ?? 0,
+      corrigees: r.copies_corrected ?? 0,
+    },
+    title: r.title,
+    subjectLabel: subjectLabelFr(r.subject),
+    level: r.level,
+    dateStr: formatShortDate(r.updated_at),
+    copiesGen: r.copies_generated ?? 0,
+    copiesCorr: r.copies_corrected ?? 0,
+  }));
+
   return (
     <div className="p-8 lg:p-10">
       <header className="mb-6 border-b border-gray-200 pb-6">
@@ -67,68 +85,7 @@ export default async function ArchivesPage() {
           accentClass="border-t-gray-400"
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-card">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs font-medium uppercase tracking-wide text-gray-500">
-                  <th className="px-6 py-4">Évaluation</th>
-                  <th className="px-6 py-4">Niveau</th>
-                  <th className="px-6 py-4">Clôturée le</th>
-                  <th className="px-6 py-4">Copies</th>
-                  <th className="px-6 py-4">Corrigées</th>
-                  <th className="px-6 py-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr
-                    key={r.id}
-                    className="border-b border-gray-50 last:border-0"
-                  >
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-gray-900">{r.title}</p>
-                      <p className="text-xs text-gray-500">
-                        {subjectLabelFr(r.subject)}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">{r.level}</td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {formatShortDate(r.updated_at)}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {r.copies_generated ?? 0}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold text-primary-500">
-                        {r.copies_corrected ?? 0}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/dashboard/evaluations/${r.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Voir
-                        </Link>
-                        <button
-                          type="button"
-                          disabled
-                          className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-400"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          Export
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <ArchivesTableClient rows={archiveClientRows} />
       )}
     </div>
   );

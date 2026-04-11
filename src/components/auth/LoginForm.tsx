@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Lock, Mail } from "lucide-react";
+import { ArrowRight, Loader2, Lock, Mail } from "lucide-react";
 import { AlertMessage, ConfigCode } from "@/components/ui/AlertMessage";
 import { FieldError } from "@/components/ui/FieldError";
 import { mapApiError } from "@/lib/api-errors";
@@ -174,10 +174,12 @@ function LoginFormInner() {
       <button
         type="submit"
         disabled={loading}
+        aria-busy={loading}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-600 disabled:pointer-events-none disabled:opacity-60"
       >
+        {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
         {loading ? "Connexion…" : "Se connecter"}
-        {!loading && <ArrowRight className="h-4 w-4" />}
+        {!loading && <ArrowRight className="h-4 w-4 shrink-0" />}
       </button>
       <p className="text-center text-sm text-gray-600">
         Vous n&apos;avez pas de compte ?{" "}

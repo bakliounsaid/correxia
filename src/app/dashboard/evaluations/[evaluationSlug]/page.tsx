@@ -1,19 +1,13 @@
 import Link from "next/link";
-import { ArrowLeft, Eye } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { subjectLabelFr } from "@/lib/dashboard-profile";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { normalizeRelationOne } from "@/lib/supabase-join";
 import { getTeacherId } from "@/lib/teacher-context";
+import { EvaluationDetailEditor } from "@/components/dashboard/EvaluationDetailEditor";
+import { StartTestButton } from "@/components/dashboard/StartTestButton";
+import { EvaluationCopiesTable, type EvaluationCopyRow } from "@/components/dashboard/EvaluationCopiesTable";
 import { notFound } from "next/navigation";
-
-function formatShortDate(iso: string | null | undefined) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 type Props = { params: { evaluationSlug: string } };
 
@@ -26,7 +20,9 @@ export default async function EvaluationDetailPage({ params }: Props) {
 
   const { data: test } = await supabase
     .from("tests")
-    .select("id, title, subject, level, teacher_id")
+    .select(
+      "id, title, subject, level, class_name, status, total_points, duration_minutes, created_at, copies_generated, copies_corrected, copies_submitted, questions, rubric, teacher_id, subject_file_url, subject_file_name, correction_file_url, correction_file_name",
+    )
     .eq("id", testId)
     .maybeSingle();
 
@@ -35,13 +31,54 @@ export default async function EvaluationDetailPage({ params }: Props) {
   const { data: copies } = await supabase
     .from("test_copies")
     .select(
-      "id, status, created_at, students ( first_name, last_name, class_name )",
+      "id, unique_test_id, status, created_at, pdf_url, scanned_image_url, students ( first_name, last_name, classes(name) ), copy_corrections ( teacher_validated_points, ai_total_points, ai_confidence_score, is_validated )",
     )
     .eq("test_id", testId)
     .eq("teacher_id", teacherId)
     .order("created_at", { ascending: false });
 
   const rows = copies ?? [];
+  const depositedRows = rows.filter((r) => Boolean(r.scanned_image_url));
+  const allDepositedCopiesValidated =
+    depositedRows.length > 0 &&
+    depositedRows.every((r) => {
+      type Corr = { is_validated: boolean | null };
+      const corr = normalizeRelationOne<Corr>(
+        r.copy_corrections as Corr | Corr[] | null,
+      );
+      return corr?.is_validated === true;
+    });
+
+  const copyRows: EvaluationCopyRow[] = rows.map((r) => {
+    type St = {
+      first_name: string;
+      last_name: string;
+      classes: { name: string } | { name: string }[] | null;
+    };
+    type Corr = {
+      teacher_validated_points: number | null;
+      ai_total_points: number | null;
+      ai_confidence_score: number | null;
+      is_validated: boolean | null;
+    };
+    const st = normalizeRelationOne<St>(r.students as St | St[] | null);
+    const corr = normalizeRelationOne<Corr>(r.copy_corrections as Corr | Corr[] | null);
+    const cls = st ? (Array.isArray(st.classes) ? (st.classes[0] ?? null) : st.classes) : null;
+    return {
+      id: r.id as string,
+      unique_test_id: (r.unique_test_id as string | null) ?? null,
+      status: (r.status as string) ?? "generated",
+      created_at: r.created_at as string,
+      pdf_url: (r.pdf_url as string | null) ?? null,
+      scanned_image_url: (r.scanned_image_url as string | null) ?? null,
+      first_name: st?.first_name ?? "—",
+      last_name: st?.last_name ?? "—",
+      class_name: cls?.name ?? "—",
+      note: corr?.teacher_validated_points ?? null,
+      ia_suggested_note: corr?.ai_total_points ?? null,
+      precision: corr?.ai_confidence_score ?? null,
+    };
+  });
 
   return (
     <div className="p-8 lg:p-10">
@@ -53,77 +90,47 @@ export default async function EvaluationDetailPage({ params }: Props) {
         Retour aux évaluations
       </Link>
       <header className="mb-8 border-b border-gray-200 pb-6">
-        <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
-          {test.title}
-        </h1>
-        <p className="mt-1 text-gray-500">
-          {subjectLabelFr(test.subject)} · {test.level} · {rows.length} copie
-          {rows.length !== 1 ? "s" : ""}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+              {test.title}
+            </h1>
+            <p className="mt-1 text-gray-500">
+              {rows.length > 0
+                ? `${rows.length} élève${rows.length !== 1 ? "s" : ""} · `
+                : ""}
+              {(test.class_name as string | null) || test.level} · {subjectLabelFr(test.subject)}
+            </p>
+          </div>
+          <StartTestButton
+            evaluationId={testId}
+            status={test.status}
+            hasCorrectionFile={Boolean(test.correction_file_url)}
+            copyCount={rows.length}
+            hasDepositedCopy={rows.some((r) => Boolean(r.scanned_image_url))}
+            allDepositedCopiesValidated={allDepositedCopiesValidated}
+            evaluationTitle={test.title}
+            classLabel={(test.class_name as string | null) || test.level}
+            durationMinutes={(test.duration_minutes as number | null) ?? null}
+            questions={test.questions}
+          />
+        </div>
       </header>
 
-      {rows.length === 0 ? (
-        <p className="text-gray-500">
-          Aucune copie pour cette évaluation. Générez des copies côté produit ou
-          insérez des lignes dans{" "}
-          <code className="rounded bg-gray-100 px-1 text-sm">test_copies</code>.
-        </p>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-card">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-xs font-medium uppercase tracking-wide text-gray-500">
-                <th className="px-6 py-3">Élève</th>
-                <th className="px-6 py-3">Classe</th>
-                <th className="px-6 py-3">Statut</th>
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                type St = {
-                  first_name: string;
-                  last_name: string;
-                  class_name: string | null;
-                };
-                const st = normalizeRelationOne<St>(
-                  r.students as St | St[] | null,
-                );
-                const name = st
-                  ? `${st.first_name} ${st.last_name}`.trim()
-                  : "—";
-                return (
-                  <tr
-                    key={r.id}
-                    className="border-b border-gray-50 last:border-0"
-                  >
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {st?.class_name ?? "—"}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">{r.status}</td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {formatShortDate(r.created_at)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <Link
-                        href={`/dashboard/evaluations/${testId}/copie/${r.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-primary-500 px-4 py-2 text-xs font-medium text-white hover:bg-primary-600"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        Réviser
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {rows.length > 0 ? (
+        <section className="mb-10">
+          <EvaluationCopiesTable
+            evaluationId={testId}
+            initialRows={copyRows}
+            testTitle={test.title}
+            className={(test.class_name as string | null) || test.level}
+            durationMinutes={(test.duration_minutes as number | null) ?? null}
+            questions={test.questions}
+          />
+        </section>
+      ) : null}
+
+      <EvaluationDetailEditor evaluation={test} />
     </div>
   );
 }

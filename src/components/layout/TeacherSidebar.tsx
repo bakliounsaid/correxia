@@ -10,7 +10,7 @@ import {
   GraduationCap,
   ClipboardList,
   Archive,
-  SlidersHorizontal,
+  Sparkles,
   LogOut,
 } from "lucide-react";
 import { CorrexiaLogo } from "@/components/brand/CorrexiaLogo";
@@ -20,19 +20,14 @@ import { cn } from "@/lib/utils";
 
 const teacherNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/classes", label: "Mes Classes", icon: Users },
+  { href: "/dashboard/evaluations", label: "Évaluations", icon: ClipboardList },
   {
     href: "/dashboard/eleves",
     label: "Mes élèves",
     icon: CircleUserRound,
   },
-  { href: "/dashboard/evaluations", label: "Évaluations", icon: ClipboardList },
+  { href: "/dashboard/classes", label: "Mes Classes", icon: Users },
   { href: "/dashboard/archives", label: "Archives", icon: Archive },
-  {
-    href: "/dashboard/bareme",
-    label: "Paramètres du barème",
-    icon: SlidersHorizontal,
-  },
 ];
 
 const schoolNav = [
@@ -47,9 +42,17 @@ type Props = {
   subtitle: string;
   initials: string;
   role?: string;
+  /** Enseignant libre : bouton packs Avancé / Maîtrise */
+  showTeacherUpgrade?: boolean;
 };
 
-export function TeacherSidebar({ displayName, subtitle, initials, role }: Props) {
+export function TeacherSidebar({
+  displayName,
+  subtitle,
+  initials,
+  role,
+  showTeacherUpgrade,
+}: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -68,8 +71,8 @@ export function TeacherSidebar({ displayName, subtitle, initials, role }: Props)
   }
 
   return (
-    <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-gray-200 bg-white">
-      <div className="flex items-start gap-3 px-5 py-6">
+    <aside className="w-full shrink-0 border-b border-gray-200 bg-white md:sticky md:top-0 md:flex md:h-screen md:w-[260px] md:flex-col md:border-b-0 md:border-r">
+      <div className="hidden items-start gap-3 px-5 py-6 md:flex">
         <CorrexiaLogo size={36} />
         <div>
           <p className="text-[15px] font-semibold tracking-tight text-gray-900">
@@ -81,7 +84,7 @@ export function TeacherSidebar({ displayName, subtitle, initials, role }: Props)
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 px-3">
+      <nav className="flex gap-1 overflow-x-auto px-3 py-3 md:flex-1 md:flex-col md:overflow-visible md:py-0">
         {nav.map(({ href, label, icon: Icon }) => {
           const active =
             href === "/dashboard"
@@ -92,7 +95,7 @@ export function TeacherSidebar({ displayName, subtitle, initials, role }: Props)
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex shrink-0 items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors md:gap-3 md:py-2.5",
                 active
                   ? "bg-primary-500 text-white shadow-sm"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
@@ -105,7 +108,29 @@ export function TeacherSidebar({ displayName, subtitle, initials, role }: Props)
         })}
       </nav>
 
-      <div className="mt-auto border-t border-gray-100 p-4">
+      {role === "school_admin" ? (
+        <div className="px-3 pb-3 pt-1 md:border-t md:border-gray-100 md:pb-4 md:pt-4">
+          <Link
+            href="/dashboard/abonnement?upgrade=1"
+            className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-primary-500 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600"
+          >
+            <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} />
+            Mettre à niveau
+          </Link>
+        </div>
+      ) : showTeacherUpgrade ? (
+        <div className="px-3 pb-3 pt-1 md:border-t md:border-gray-100 md:pb-4 md:pt-4">
+          <Link
+            href="/dashboard/abonnement-enseignant?upgrade=1"
+            className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-primary-500 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600"
+          >
+            <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} />
+            Mettre à niveau
+          </Link>
+        </div>
+      ) : null}
+
+      <div className="mt-auto hidden border-t border-gray-100 p-4 md:block">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ia-500 text-sm font-semibold text-white">
             {initials}

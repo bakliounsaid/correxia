@@ -48,8 +48,8 @@ export function AdminSidebar({ displayName, subtitle, initials }: Props) {
   }
 
   return (
-    <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-gray-200 bg-white">
-      <div className="flex items-start gap-3 px-5 py-6">
+    <aside className="w-full shrink-0 border-b border-gray-200 bg-white md:flex md:h-full md:w-[260px] md:flex-col md:border-b-0 md:border-r">
+      <div className="hidden items-start gap-3 px-5 py-6 md:flex">
         <CorrexiaLogo size={36} />
         <div>
           <p className="text-[15px] font-semibold tracking-tight text-gray-900">
@@ -59,7 +59,7 @@ export function AdminSidebar({ displayName, subtitle, initials }: Props) {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 px-3">
+      <nav className="flex gap-1 overflow-x-auto px-3 py-3 md:flex-1 md:flex-col md:overflow-visible md:py-0">
         {nav.map(({ href, label, icon: Icon }) => {
           const active =
             href === "/admin"
@@ -70,7 +70,7 @@ export function AdminSidebar({ displayName, subtitle, initials }: Props) {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex shrink-0 items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors md:gap-3 md:py-2.5",
                 active
                   ? "bg-primary-500 text-white shadow-sm"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
@@ -83,7 +83,7 @@ export function AdminSidebar({ displayName, subtitle, initials }: Props) {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-gray-100 p-4">
+      <div className="mt-auto hidden border-t border-gray-100 p-4 md:block">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-sm font-semibold text-white">
             {initials}

@@ -15,6 +15,9 @@ export const USER_MESSAGES = {
   configSupabaseShort:
     "Ajoutez un fichier .env.local avec les clés Supabase (URL + clé anon), puis redémarrez npm run dev.",
   fillRequiredFields: "Remplissez tous les champs obligatoires.",
+  /** Case RGPD non cochée à l’inscription */
+  rgpdConsentRequired:
+    "Vous devez accepter le traitement de vos données (RGPD) pour créer un compte.",
   schoolSignupPending:
     "L’inscription établissement en ligne arrive bientôt. En attendant, contactez-nous via la page d’accueil (section Contact).",
   /** Utilisé avec setCustomValidity sur le champ confirmation */
