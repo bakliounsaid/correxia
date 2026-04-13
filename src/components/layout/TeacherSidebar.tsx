@@ -71,9 +71,9 @@ export function TeacherSidebar({
   }
 
   return (
-    <aside className="w-full shrink-0 border-b border-gray-200 bg-white md:sticky md:top-0 md:flex md:h-screen md:w-[260px] md:flex-col md:border-b-0 md:border-r">
+    <aside className="flex w-full shrink-0 flex-col border-b border-gray-200 bg-white supports-[padding:max(0px)]:pt-[env(safe-area-inset-top)] md:sticky md:top-0 md:min-h-[100dvh] md:w-[260px] md:border-b-0 md:border-r md:supports-[padding:max(0px)]:pt-0">
       <div className="hidden items-start gap-3 px-5 py-6 md:flex">
-        <CorrexiaLogo size={36} />
+        <CorrexiaLogo variant="svg" size={36} />
         <div>
           <p className="text-[15px] font-semibold tracking-tight text-gray-900">
             CORREXIA
@@ -130,7 +130,7 @@ export function TeacherSidebar({
         </div>
       ) : null}
 
-      <div className="mt-auto hidden border-t border-gray-100 p-4 md:block">
+      <div className="mt-auto border-t border-gray-100 p-4 supports-[padding:max(0px)]:pb-[max(1rem,env(safe-area-inset-bottom))] md:supports-[padding:max(0px)]:pb-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ia-500 text-sm font-semibold text-white">
             {initials}

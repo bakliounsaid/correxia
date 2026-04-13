@@ -82,11 +82,22 @@ export async function PATCH(
   if (!existing) {
     return NextResponse.json({ error: "Évaluation introuvable." }, { status: 404 });
   }
-  if ((existing.status ?? "").toLowerCase() !== "created") {
-    return NextResponse.json(
-      { error: "Modification autorisée uniquement pour les tests au statut created." },
-      { status: 409 },
-    );
+
+  const statusNorm = (existing.status ?? "").toLowerCase();
+  const patchKeys = Object.keys(patch);
+  const correctionOnlyKeys = ["correction_file_url", "correction_file_name"];
+  const isCorrectionFileOnly =
+    patchKeys.length > 0 && patchKeys.every((k) => correctionOnlyKeys.includes(k));
+
+  const canEditAll = statusNorm === "created";
+  const canReplaceCorrectionWhileInProgress = statusNorm === "in_progress" && isCorrectionFileOnly;
+
+  if (!canEditAll && !canReplaceCorrectionWhileInProgress) {
+    const error =
+      statusNorm === "in_progress" && !isCorrectionFileOnly
+        ? "Pendant l’examen, seuls le fichier et le nom de la correction type peuvent être mis à jour."
+        : "Modification autorisée uniquement pour les tests au statut créée, ou remplacement de la correction type tant que l’examen est en cours.";
+    return NextResponse.json({ error }, { status: 409 });
   }
 
   const { data, error } = await supabase

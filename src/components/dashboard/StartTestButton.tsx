@@ -6,6 +6,11 @@ import Swal from "sweetalert2";
 import { Download, Play, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import {
+  decodeQrFromImageFile,
+  PDF_QR_PNG_WIDTH_PX,
+  PDF_QR_SIZE_MM,
+} from "@/lib/qr-scan";
 
 type StudentOption = {
   id: string;
@@ -71,7 +76,9 @@ function StartTestButtonInner({
   const normalizedStatus = (status || "").toLowerCase();
   const isStartableStatus = normalizedStatus === "created" || normalizedStatus === "in_progress";
   const [hasLocalCorrectionFile, setHasLocalCorrectionFile] = useState(hasCorrectionFile);
-  const canEditFiles = status === "created";
+  /** Trame + upload / remplacement correction type : autorisé tant que l’évaluation n’est pas terminée (créée ou en cours). */
+  const canEditCorrectionFiles =
+    normalizedStatus === "created" || normalizedStatus === "in_progress";
   const showStartExam = normalizedStatus === "created" && copyCount === 0;
   const showDepositSheets = isStartableStatus && copyCount > 0;
   const showLaunchCorrection =
@@ -135,7 +142,10 @@ function StartTestButtonInner({
   async function generatePrintablePdf(test: TestPayload, copies: GeneratedCopy[]) {
     const { jsPDF } = await import("jspdf");
     const QRCode = (await import("qrcode")) as {
-      toDataURL: (text: string, opts?: { margin?: number; width?: number }) => Promise<string>;
+      toDataURL: (
+        text: string,
+        opts?: { margin?: number; width?: number; errorCorrectionLevel?: string },
+      ) => Promise<string>;
     };
     const doc = new jsPDF({ unit: "mm", format: "a4" });
 
@@ -199,8 +209,12 @@ function StartTestButtonInner({
         y += boxHeight + 5;
       });
 
-      const qrDataUrl = await QRCode.toDataURL(cp.unique_test_id, { margin: 1, width: 90 });
-      const qrSize = 12;
+      const qrDataUrl = await QRCode.toDataURL(cp.unique_test_id, {
+        margin: 1,
+        width: PDF_QR_PNG_WIDTH_PX,
+        errorCorrectionLevel: "Q",
+      });
+      const qrSize = PDF_QR_SIZE_MM;
       const endPage = doc.getNumberOfPages();
       for (let p = startPage; p <= endPage; p += 1) {
         doc.setPage(p);
@@ -467,29 +481,19 @@ function StartTestButtonInner({
       let successCount = 0;
       const failures: string[] = [];
 
-      const decodeQrFromImageFile = async (file: File): Promise<string | null> => {
-        const bitmap = await createImageBitmap(file);
-        const canvas = document.createElement("canvas");
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return null;
-        ctx.drawImage(bitmap, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const { default: jsQR } = await import("jsqr");
-        const result = jsQR(imageData.data, imageData.width, imageData.height);
-        return result?.data ?? null;
-      };
-
       for (let i = 0; i < inputFiles.length; i += 1) {
         const f = inputFiles[i];
         try {
           if (!f.type.startsWith("image/")) {
-            throw new Error("format non supporté pour vérification QR (utiliser image JPG/PNG)");
+            throw new Error(
+              "Format non supporté pour la lecture du QR : utilisez une photo ou un scan JPG ou PNG (pas de PDF).",
+            );
           }
           const qrValue = await decodeQrFromImageFile(f);
           if (!qrValue) {
-            throw new Error("QR code introuvable ou illisible");
+            throw new Error(
+              "QR code introuvable ou illisible : exportez la page en entier (évitez le zoom sur une zone), bonne lumière, pas de flou. Les applis « PDF Scanner » avec grosses marges noires posent souvent problème — préférez une photo de la feuille seule ou régénérez les copies (QR plus grand).",
+            );
           }
           const target = availableByQr.get(qrValue);
           if (!target) {
@@ -571,7 +575,7 @@ function StartTestButtonInner({
           variant="outline"
           className="border-gray-200"
           onClick={() => void downloadCorrectionTemplate()}
-          disabled={!canEditFiles || downloadingTemplate}
+          disabled={!canEditCorrectionFiles || downloadingTemplate}
           loading={downloadingTemplate}
           loadingText="Préparation du PDF…"
           title="Télécharger une trame dédiée à la correction type (document enseignant)"
@@ -584,9 +588,9 @@ function StartTestButtonInner({
           variant="outline"
           className="border-gray-200"
           onClick={() => fileInputRef.current?.click()}
-          disabled={!canEditFiles || uploadingCorrection}
+          disabled={!canEditCorrectionFiles || uploadingCorrection}
           title={
-            canEditFiles
+            canEditCorrectionFiles
               ? "Uploader la correction type"
               : "Le test n'est plus modifiable"
           }

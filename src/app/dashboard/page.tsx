@@ -2,9 +2,7 @@ import {
   AlertCircle,
   BarChart3,
   CheckCircle2,
-  ClipboardList,
   Clock,
-  FileStack,
   GraduationCap,
   CircleUserRound,
   LayoutGrid,
@@ -118,29 +116,17 @@ export default async function DashboardPage() {
 
   let countClasses = 0;
   let countEleves = 0;
-  let countEvaluations = 0;
-  let countCopiesTotal = 0;
   let countCopiesACorriger = 0;
   let countCopiesEnCours = 0;
   let countCopiesCorrigees = 0;
 
   if (teacherId) {
     const [
-      testsTotal,
-      copiesTotal,
       copiesACorriger,
       copiesEnCours,
       copiesCorrige,
       classTeachersRes,
     ] = await Promise.all([
-      supabase
-        .from("tests")
-        .select("*", { count: "exact", head: true })
-        .eq("teacher_id", teacherId),
-      supabase
-        .from("test_copies")
-        .select("*", { count: "exact", head: true })
-        .eq("teacher_id", teacherId),
       supabase
         .from("test_copies")
         .select("*", { count: "exact", head: true })
@@ -159,8 +145,6 @@ export default async function DashboardPage() {
       supabase.from("class_teachers").select("class_id").eq("teacher_id", teacherId),
     ]);
 
-    countEvaluations = testsTotal.count ?? 0;
-    countCopiesTotal = copiesTotal.count ?? 0;
     countCopiesACorriger = copiesACorriger.count ?? 0;
     countCopiesEnCours = copiesEnCours.count ?? 0;
     countCopiesCorrigees = copiesCorrige.count ?? 0;
@@ -238,23 +222,6 @@ export default async function DashboardPage() {
     },
   ];
 
-  const statsEvaluations = [
-    {
-      label: "Évaluations créées",
-      value: String(countEvaluations),
-      icon: ClipboardList,
-      iconBg: "bg-primary-50",
-      iconColor: "text-primary-600",
-    },
-    {
-      label: "Copies au total",
-      value: String(countCopiesTotal),
-      icon: FileStack,
-      iconBg: "bg-gray-100",
-      iconColor: "text-gray-700",
-    },
-  ];
-
   return (
     <div className="p-8 lg:p-10">
       <header className="mb-8 border-b border-gray-200 pb-6">
@@ -296,29 +263,6 @@ export default async function DashboardPage() {
             {"hint" in s && s.hint ? (
               <p className="mt-2 text-xs leading-snug text-gray-400">{s.hint}</p>
             ) : null}
-          </div>
-        ))}
-      </div>
-
-      <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-        Évaluations et volumes
-      </p>
-      <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-2 lg:max-w-3xl">
-        {statsEvaluations.map((s) => (
-          <div
-            key={s.label}
-            className="rounded-xl border border-gray-100 bg-white p-6 shadow-card"
-          >
-            <div
-              className={cn(
-                "mb-4 flex h-12 w-12 items-center justify-center rounded-full",
-                s.iconBg,
-              )}
-            >
-              <s.icon className={cn("h-6 w-6", s.iconColor)} strokeWidth={2} />
-            </div>
-            <p className="text-3xl font-semibold text-gray-900">{s.value}</p>
-            <p className="mt-1 text-sm text-gray-500">{s.label}</p>
           </div>
         ))}
       </div>

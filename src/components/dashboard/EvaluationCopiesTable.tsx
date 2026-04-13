@@ -1,11 +1,13 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, Eye, X } from "lucide-react";
 import Swal from "sweetalert2";
 import { Button } from "@/components/ui/Button";
 import { ListExportButton } from "@/components/ui/ListExportButton";
+import { PDF_QR_PNG_WIDTH_PX, PDF_QR_SIZE_MM } from "@/lib/qr-scan";
 import { TableSelectCheckbox } from "@/components/ui/TableSelectCheckbox";
 import { useRowSelection } from "@/hooks/useRowSelection";
 import { CopyReviewWorkspace } from "@/components/dashboard/CopyReviewWorkspace";
@@ -46,6 +48,7 @@ type ReviewPayload = {
   aiConfidence: number | null;
   aiFeedback: string;
   aiPerExercise: Array<{ label: string; score: number; max: number; comment?: string }>;
+  passagesAVerifier?: Array<{ zone: string; detail: string; source?: string }>;
   validatedScore: number | null;
 };
 
@@ -145,6 +148,43 @@ function EvaluationCopiesTableInner({
     return `${Math.round(percent)}%`;
   }
 
+  /** Pourcentage 0–100, ou null si inconnu. */
+  function precisionToPercent(value: number | null): number | null {
+    if (value == null || Number.isNaN(value)) return null;
+    return value <= 1 ? value * 100 : value;
+  }
+
+  const PRECISION_OK = 85;
+
+  function precisionBadge(value: number | null) {
+    const p = precisionToPercent(value);
+    if (p == null) {
+      return (
+        <span className="text-sm font-medium text-gray-400" title="Pas encore de correction IA sur cette copie">
+          —
+        </span>
+      );
+    }
+    const rounded = Math.round(p);
+    const ok = p >= PRECISION_OK;
+    return (
+      <span
+        className={
+          ok
+            ? "inline-flex min-w-[3.25rem] justify-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 ring-1 ring-inset ring-emerald-200/80"
+            : "inline-flex min-w-[3.25rem] justify-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800 ring-1 ring-inset ring-red-200/80"
+        }
+        title={
+          ok
+            ? `Précision IA ${rounded} % — fiabilité élevée (seuil ${PRECISION_OK} %)`
+            : `Précision IA ${rounded} % — revue enseignant recommandée (seuil ${PRECISION_OK} %)`
+        }
+      >
+        {rounded}%
+      </span>
+    );
+  }
+
   const copyExportColumns = useMemo(
     () => [
       { key: "nom", header: "Nom" },
@@ -200,7 +240,10 @@ function EvaluationCopiesTableInner({
     try {
       const { jsPDF } = await import("jspdf");
       const QRCode = (await import("qrcode")) as {
-        toDataURL: (text: string, opts?: { margin?: number; width?: number }) => Promise<string>;
+        toDataURL: (
+          text: string,
+          opts?: { margin?: number; width?: number; errorCorrectionLevel?: string },
+        ) => Promise<string>;
       };
       const doc = new jsPDF({ unit: "mm", format: "a4" });
       const left = 14;
@@ -257,8 +300,12 @@ function EvaluationCopiesTableInner({
       });
 
       if (row.unique_test_id) {
-        const qrDataUrl = await QRCode.toDataURL(row.unique_test_id, { margin: 1, width: 90 });
-        const qrSize = 12;
+        const qrDataUrl = await QRCode.toDataURL(row.unique_test_id, {
+          margin: 1,
+          width: PDF_QR_PNG_WIDTH_PX,
+          errorCorrectionLevel: "Q",
+        });
+        const qrSize = PDF_QR_SIZE_MM;
         const pages = doc.getNumberOfPages();
         for (let p = 1; p <= pages; p += 1) {
           doc.setPage(p);
@@ -331,6 +378,7 @@ function EvaluationCopiesTableInner({
                   aiConfidence={reviewData.aiConfidence}
                   aiFeedback={reviewData.aiFeedback}
                   aiPerExercise={reviewData.aiPerExercise}
+                  passagesAVerifier={reviewData.passagesAVerifier}
                   validatedScore={reviewData.validatedScore}
                   onClose={closeReview}
                   onRevisionSaved={() => router.refresh()}
@@ -377,7 +425,12 @@ function EvaluationCopiesTableInner({
             <th className="px-6 py-3">Date</th>
             <th className="px-6 py-3">Note</th>
             <th className="px-6 py-3">Proposition IA</th>
-            <th className="px-6 py-3">Précision IA</th>
+            <th
+              className="px-6 py-3"
+              title={`Vert : précision ≥ ${PRECISION_OK} %. Rouge : &lt; ${PRECISION_OK} % — copie à relire en priorité.`}
+            >
+              Précision IA
+            </th>
             <th className="px-6 py-3">Actions</th>
           </tr>
         </thead>
@@ -402,7 +455,7 @@ function EvaluationCopiesTableInner({
               <td className="px-6 py-4 text-gray-700">
                 {r.ia_suggested_note != null ? `${r.ia_suggested_note}/20` : "—"}
               </td>
-              <td className="px-6 py-4 text-gray-700">{formatPrecision(r.precision)}</td>
+              <td className="px-6 py-4 align-middle">{precisionBadge(r.precision)}</td>
               <td className="px-6 py-4">
                 <div className="flex flex-wrap items-center gap-1">
                   {canReview(r) ? (
@@ -415,13 +468,14 @@ function EvaluationCopiesTableInner({
                       Réviser
                     </button>
                   ) : (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-500"
-                      title="La révision sera disponible une fois la correction IA effectuée sur cette copie."
+                    <Link
+                      href={`/dashboard/evaluations/${evaluationId}`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-50"
+                      title="Ouvrez la fiche de l’évaluation pour suivre l’avancement. La révision de cette copie sera disponible après la correction IA."
                     >
-                      <Eye className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                      Après correction
-                    </span>
+                      <Eye className="h-3.5 w-3.5 shrink-0" />
+                      Consulter
+                    </Link>
                   )}
                   <button
                     type="button"

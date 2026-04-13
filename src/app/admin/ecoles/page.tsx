@@ -8,7 +8,6 @@ type SchoolRow = {
   city: string | null;
   country: string | null;
   subscription_status: string | null;
-  stripe_subscription_id: string | null;
   created_at: string;
 };
 
@@ -38,7 +37,7 @@ export default async function AdminEcolesPage() {
   const { data, error } = await supabase
     .from("schools")
     .select(
-      "id, name, email, city, country, subscription_status, stripe_subscription_id, created_at",
+      "id, name, email, city, country, subscription_status, created_at",
     )
     .order("created_at", { ascending: false });
 
@@ -54,7 +53,6 @@ export default async function AdminEcolesPage() {
         ville: r.city ?? "",
         pays: r.country ?? "",
         statut_abo: st.label,
-        stripe: r.stripe_subscription_id ?? "",
         cree_le: formatDate(r.created_at),
       },
       name: r.name,
@@ -63,7 +61,6 @@ export default async function AdminEcolesPage() {
       country: r.country,
       statusLabel: st.label,
       statusBadgeClass: st.className,
-      stripeYes: Boolean(r.stripe_subscription_id),
       createdLabel: formatDate(r.created_at),
     };
   });

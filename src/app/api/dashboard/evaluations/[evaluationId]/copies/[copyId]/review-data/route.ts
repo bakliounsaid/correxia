@@ -3,6 +3,7 @@ import { subjectLabelFr } from "@/lib/dashboard-profile";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { normalizeRelationOne } from "@/lib/supabase-join";
 import { getTeacherId } from "@/lib/teacher-context";
+import { parsePassagesAVerifier } from "@/lib/copy-revision-passages";
 
 export async function GET(
   _req: Request,
@@ -49,6 +50,7 @@ export async function GET(
     ai_analysis_json: {
       feedback?: string;
       per_exercise?: Array<{ label?: string; score?: number; max?: number; comment?: string }>;
+      passages_a_verifier?: unknown;
     } | null;
   };
 
@@ -83,6 +85,7 @@ export async function GET(
         }))
       : [],
     validatedScore: corr?.teacher_validated_points ?? null,
+    passagesAVerifier: parsePassagesAVerifier(corr?.ai_analysis_json?.passages_a_verifier),
   };
 
   return NextResponse.json({ ok: true, payload });

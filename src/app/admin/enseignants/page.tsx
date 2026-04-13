@@ -37,8 +37,9 @@ export default async function AdminEnseignantsPage() {
   const { data, error } = await supabase
     .from("teachers")
     .select(
-      "id, subject, subscription_plan, subscription_status, created_at, is_independent, users ( full_name, email )",
+      "id, subject, subscription_plan, subscription_status, created_at, is_independent, users!inner ( full_name, email, role )",
     )
+    .eq("users.role", "teacher")
     .order("created_at", { ascending: false });
 
   const rows: TeacherRow[] = (data ?? []).map((row) => ({

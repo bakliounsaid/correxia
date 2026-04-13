@@ -11,13 +11,15 @@ export default async function AdminLayout({
   const initials = adminInitials(profile.full_name || "", profile.email);
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50 md:flex-row">
+    <div className="flex min-h-[100dvh] flex-col items-stretch bg-gray-50 md:flex-row md:items-stretch">
       <AdminSidebar
         displayName={displayName}
         subtitle="Plateforme"
         initials={initials}
       />
-      <main className="min-h-screen min-w-0 flex-1 overflow-auto">{children}</main>
+      <main className="min-h-[100dvh] min-w-0 flex-1 overflow-auto md:min-h-0">
+        {children}
+      </main>
     </div>
   );
 }

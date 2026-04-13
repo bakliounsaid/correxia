@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,11 +12,19 @@ import {
   Sparkles,
 } from "lucide-react";
 import { CorrexiaLogo } from "@/components/brand/CorrexiaLogo";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { LandingHeader } from "@/components/landing/LandingHeader";
 import { ContactSection } from "@/components/landing/ContactSection";
 import { WorkflowMockup } from "@/components/landing/WorkflowMockup";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { Reveal } from "@/components/landing/Reveal";
 import { StatCounter } from "@/components/landing/StatCounter";
+
+const PlatformChatbot = dynamic(
+  () =>
+    import("@/components/support/PlatformChatbot").then((m) => m.PlatformChatbot),
+  { ssr: false, loading: () => null },
+);
 
 const faqItems = [
   {
@@ -59,66 +69,101 @@ const stats = [
   },
 ];
 
-export default function HomePage() {
+const testimonials = [
+  {
+    quote:
+      "J'économise environ 6 heures par semaine sur la correction. Je consacre ce temps aux élèves qui en ont besoin. La validation manuelle reste indispensable, et CORREXIA respecte ça.",
+    author: "Thomas D.",
+    role: "Professeur de physique-chimie",
+    context: "Lycée technologique — Lyon",
+    accent: "primary",
+  },
+  {
+    quote:
+      "Notre établissement cherchait une solution pérenne pour les évaluations. CORREXIA s'est imposé par sa simplicité et la qualité des analyses. Les statistiques par classe sont précieuses.",
+    author: "Sophie M.",
+    role: "Directrice pédagogique",
+    context: "Lycée privé — Bordeaux",
+    accent: "success",
+  },
+  {
+    quote:
+      "Les suggestions de l'IA sont pertinentes et le barème est bien respecté. J'apprécie de pouvoir ajuster les points avant validation. Un vrai gain de temps pour les devoirs surveillés.",
+    author: "Pierre R.",
+    role: "Enseignant de mathématiques",
+    context: "Lycée — Nantes",
+    accent: "ia",
+  },
+] as const;
+
+const landingPosts = [
+  {
+    tag: "Pédagogie",
+    title: "Barème et IA : garder le contrôle pédagogique",
+    excerpt:
+      "Comment structurer un barème clair pour que la correction assistée reste alignée avec vos objectifs.",
+  },
+  {
+    tag: "IA",
+    title: "Correction scientifique et vision par ordinateur",
+    excerpt:
+      "Ce que l'IA voit dans une copie manuscrite de maths ou de physique - et ses limites.",
+  },
+  {
+    tag: "Organisation",
+    title: "Flux de travail : de la collecte des copies à la note finale",
+    excerpt: "Un parcours type pour les classes de lycée avec CORREXIA.",
+  },
+] as const;
+
+export const metadata: Metadata = {
+  title: "CORREXIA - Correction de copies assistée par IA",
+  description:
+    "CORREXIA aide les enseignants de sciences a corriger plus vite: scan des copies, application du bareme, validation humaine et statistiques de classe.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "CORREXIA - Correction de copies assistée par IA",
+    description:
+      "Corrigez vos copies manuscrites plus vite, gardez la validation finale, et suivez les performances de vos classes.",
+    url: "/",
+    siteName: "CORREXIA",
+    locale: "fr_FR",
+    type: "website",
+  },
+};
+
+export default async function HomePage() {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const isLoggedIn = Boolean(user);
+  const primaryCtaHref = isLoggedIn ? "/dashboard" : "/register";
+  const primaryCtaLabel = isLoggedIn ? "Accéder au dashboard" : "Démarrer l'essai gratuit";
+  const secondaryCtaHref = isLoggedIn ? "/dashboard" : "/register-school";
+  const secondaryCtaLabel = isLoggedIn
+    ? "Ouvrir mon espace"
+    : "Découvrir l'offre établissement";
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "CORREXIA",
+    url: "https://correxia.app",
+    description:
+      "Plateforme de correction de copies assistée par IA pour enseignants de sciences et établissements scolaires.",
+    areaServed: "FR",
+  };
+
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      {/* Header style Examino */}
-      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/95 backdrop-blur-md motion-reduce:animate-none animate-header-in">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3.5 md:px-6">
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <CorrexiaLogo size={34} />
-            <span className="text-base font-bold tracking-tight md:text-lg">
-              CORREXIA
-            </span>
-          </Link>
-          <nav className="hidden items-center gap-6 text-sm font-medium text-gray-600 lg:flex">
-            <a
-              href="#tarifs"
-              className="transition-colors duration-200 hover:text-primary-500"
-            >
-              Tarifs
-            </a>
-            <Link
-              href="/register-school"
-              className="transition-colors duration-200 hover:text-primary-500"
-            >
-              Établissement
-            </Link>
-            <a
-              href="#temoignages"
-              className="transition-colors duration-200 hover:text-primary-500"
-            >
-              Témoignages
-            </a>
-            <a
-              href="#faq"
-              className="transition-colors duration-200 hover:text-primary-500"
-            >
-              FAQ
-            </a>
-            <a
-              href="#contact"
-              className="transition-colors duration-200 hover:text-primary-500"
-            >
-              Contact
-            </a>
-          </nav>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/login"
-              className="rounded-full border-2 border-gray-900 px-4 py-2.5 text-sm font-semibold text-gray-900 transition-all duration-300 hover:bg-gray-900 hover:text-white active:scale-[0.98] sm:px-5"
-            >
-              Se connecter
-            </Link>
-            <Link
-              href="/register"
-              className="rounded-full bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-primary-600 hover:shadow-md active:scale-[0.98] sm:px-5"
-            >
-              Essayer gratuitement
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-[100dvh] bg-white text-gray-900">
+      <LandingHeader isLoggedIn={isLoggedIn} />
+      <script
+        type="application/ld+json"
+        // Schema.org aide les moteurs à mieux comprendre le produit.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+      />
 
       {/* Hero */}
       <section
@@ -146,10 +191,10 @@ export default function HomePage() {
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center motion-reduce:animate-none animate-hero-fade-up hero-delay-2">
             <Link
-              href="/register"
+              href={primaryCtaHref}
               className="inline-flex items-center justify-center gap-2 rounded-full bg-primary-500 px-8 py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:bg-primary-600 hover:shadow-xl active:scale-[0.98]"
             >
-              Démarrer l&apos;essai gratuit
+              {primaryCtaLabel}
               <ArrowRight className="h-5 w-5" />
             </Link>
             <Link
@@ -239,32 +284,7 @@ export default function HomePage() {
             </p>
           </Reveal>
           <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                quote:
-                  "J'économise environ 6 heures par semaine sur la correction. Je consacre ce temps aux élèves qui en ont besoin. La validation manuelle reste indispensable, et CORREXIA respecte ça.",
-                author: "Thomas D.",
-                role: "Professeur de physique-chimie",
-                context: "Lycée technologique — Lyon",
-                accent: "primary",
-              },
-              {
-                quote:
-                  "Notre établissement cherchait une solution pérenne pour les évaluations. CORREXIA s'est imposé par sa simplicité et la qualité des analyses. Les statistiques par classe sont précieuses.",
-                author: "Sophie M.",
-                role: "Directrice pédagogique",
-                context: "Lycée privé — Bordeaux",
-                accent: "success",
-              },
-              {
-                quote:
-                  "Les suggestions de l'IA sont pertinentes et le barème est bien respecté. J'apprécie de pouvoir ajuster les points avant validation. Un vrai gain de temps pour les devoirs surveillés.",
-                author: "Pierre R.",
-                role: "Enseignant de mathématiques",
-                context: "Lycée — Nantes",
-                accent: "ia",
-              },
-            ].map((t, i) => {
+            {testimonials.map((t, i) => {
               const accentStyles = {
                 primary:
                   "border-l-4 border-l-primary-500 bg-gradient-to-br from-primary-50/50 to-white",
@@ -339,10 +359,10 @@ export default function HomePage() {
             ))}
           </ul>
           <Link
-            href="/register"
+            href={primaryCtaHref}
             className="mt-10 inline-flex items-center gap-2 rounded-full bg-primary-500 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-primary-600 hover:shadow-lg active:scale-[0.98]"
           >
-            Essayer gratuitement
+            {primaryCtaLabel}
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
           </Link>
         </Reveal>
@@ -363,10 +383,10 @@ export default function HomePage() {
                 sobre qui ne vous détourne pas de l&apos;essentiel.
               </p>
               <Link
-                href="/register"
+                href={secondaryCtaHref}
                 className="mt-8 inline-flex items-center gap-2 rounded-full border-2 border-gray-900 px-6 py-3 text-sm font-semibold text-gray-900 transition-all duration-300 hover:bg-gray-900 hover:text-white active:scale-[0.98]"
               >
-                Créer un compte gratuit
+                {secondaryCtaLabel}
               </Link>
             </div>
           </Reveal>
@@ -393,10 +413,10 @@ export default function HomePage() {
                 finale restent entre vos mains.
               </p>
               <Link
-                href="/register"
+                href={primaryCtaHref}
                 className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-primary-600 transition-all duration-300 hover:bg-primary-50 hover:shadow-lg active:scale-[0.98]"
               >
-                Découvrir CORREXIA
+                {primaryCtaLabel}
               </Link>
             </div>
           </Reveal>
@@ -487,26 +507,7 @@ export default function HomePage() {
             </h2>
           </Reveal>
           <div className="mt-8 grid gap-6 md:grid-cols-3">
-            {[
-              {
-                tag: "Pédagogie",
-                title: "Barème et IA : garder le contrôle pédagogique",
-                excerpt:
-                  "Comment structurer un barème clair pour que la correction assistée reste alignée avec vos objectifs.",
-              },
-              {
-                tag: "IA",
-                title: "Correction scientifique et vision par ordinateur",
-                excerpt:
-                  "Ce que l’IA voit dans une copie manuscrite de maths ou de physique — et ses limites.",
-              },
-              {
-                tag: "Organisation",
-                title: "Flux de travail : de la collecte des copies à la note finale",
-                excerpt:
-                  "Un parcours type pour les classes de lycée avec CORREXIA.",
-              },
-            ].map((post, i) => (
+            {landingPosts.map((post, i) => (
               <Reveal key={post.title} delayMs={i * 90}>
               <article
                 className="group h-full rounded-xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary-200 hover:shadow-lg"
@@ -542,10 +543,10 @@ export default function HomePage() {
             Créez votre compte en quelques minutes.
           </p>
           <Link
-            href="/register"
+            href={primaryCtaHref}
             className="group mt-8 inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-sm font-semibold text-primary-600 shadow-lg transition-all duration-300 hover:bg-primary-50 hover:shadow-xl active:scale-[0.98]"
           >
-            Essayer gratuitement
+            {primaryCtaLabel}
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
           </Link>
         </Reveal>
@@ -557,7 +558,7 @@ export default function HomePage() {
           <div className="flex flex-col gap-10 md:flex-row md:justify-between">
             <div>
               <div className="flex items-center gap-2 text-white">
-                <CorrexiaLogo size={32} />
+                <CorrexiaLogo variant="svg" size={32} />
                 <span className="font-bold">CORREXIA</span>
               </div>
               <p className="mt-3 max-w-xs text-sm text-gray-400">
@@ -582,9 +583,15 @@ export default function HomePage() {
                     </Link>
                   </li>
                   <li>
-                    <Link href="/login" className="hover:text-white">
-                      Se connecter
-                    </Link>
+                    {isLoggedIn ? (
+                      <Link href="/dashboard" className="hover:text-white">
+                        Dashboard
+                      </Link>
+                    ) : (
+                      <Link href="/login" className="hover:text-white">
+                        Se connecter
+                      </Link>
+                    )}
                   </li>
                 </ul>
               </div>
@@ -644,6 +651,8 @@ export default function HomePage() {
           </p>
         </div>
       </footer>
+
+      <PlatformChatbot />
     </div>
   );
 }

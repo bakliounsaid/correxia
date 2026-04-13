@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { normalizeRelationOne } from "@/lib/supabase-join";
 import { getTeacherId } from "@/lib/teacher-context";
 import { CopyReviewWorkspace } from "@/components/dashboard/CopyReviewWorkspace";
+import { parsePassagesAVerifier } from "@/lib/copy-revision-passages";
 
 type PageProps = {
   params: { evaluationSlug: string; copyId: string };
@@ -54,6 +55,7 @@ export default async function CopyReviewPage({ params }: PageProps) {
     ai_analysis_json: {
       feedback?: string;
       per_exercise?: Array<{ label?: string; score?: number; max?: number; comment?: string }>;
+      passages_a_verifier?: unknown;
     } | null;
   };
 
@@ -65,6 +67,7 @@ export default async function CopyReviewPage({ params }: PageProps) {
   const studentName = stu ? `${stu.first_name} ${stu.last_name}`.trim() : "Élève";
   const classe = cls?.name ?? test.level;
   const corr = normalizeRelationOne<Corr>(row.copy_corrections as Corr | Corr[] | null);
+  const passagesAVerifier = parsePassagesAVerifier(corr?.ai_analysis_json?.passages_a_verifier);
 
   return (
     <CopyReviewWorkspace
@@ -90,6 +93,7 @@ export default async function CopyReviewPage({ params }: PageProps) {
             }))
           : []
       }
+      passagesAVerifier={passagesAVerifier}
       validatedScore={corr?.teacher_validated_points ?? null}
     />
   );

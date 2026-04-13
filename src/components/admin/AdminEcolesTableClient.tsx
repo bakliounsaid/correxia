@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   SelectableExportTable,
@@ -16,7 +14,6 @@ export type AdminEcolesRow = SelectableExportRow & {
   country: string | null;
   statusLabel: string;
   statusBadgeClass: string;
-  stripeYes: boolean;
   createdLabel: string;
 };
 
@@ -26,7 +23,6 @@ const exportColumns = [
   { key: "ville", header: "Ville" },
   { key: "pays", header: "Pays" },
   { key: "statut_abo", header: "Statut abonnement" },
-  { key: "stripe", header: "Stripe" },
   { key: "cree_le", header: "Créé le" },
 ];
 
@@ -43,7 +39,7 @@ export function AdminEcolesTableClient({
       exportColumns={exportColumns}
       fileBaseName="admin-ecoles"
       sheetName="Écoles"
-      minWidthClass="min-w-[920px]"
+      minWidthClass="min-w-[720px]"
       toolbarLeft={toolbarLeft}
       headerCells={
         <>
@@ -52,9 +48,7 @@ export function AdminEcolesTableClient({
           <th className="px-6 py-3">Ville</th>
           <th className="px-6 py-3">Pays</th>
           <th className="px-6 py-3">Statut abo.</th>
-          <th className="px-6 py-3">Stripe</th>
           <th className="px-6 py-3">Créé le</th>
-          <th className="px-6 py-3">Action</th>
         </>
       }
       renderRow={({ row, selectCell }) => (
@@ -74,23 +68,7 @@ export function AdminEcolesTableClient({
               {row.statusLabel}
             </span>
           </td>
-          <td className="px-6 py-4">
-            {row.stripeYes ? (
-              <span className="font-mono text-xs text-primary-500">Oui</span>
-            ) : (
-              <span className="text-gray-400">Non</span>
-            )}
-          </td>
           <td className="px-6 py-4 text-gray-600">{row.createdLabel}</td>
-          <td className="px-6 py-4">
-            <Link
-              href="/admin/subscriptions"
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary-500 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-600"
-            >
-              <Eye className="h-3.5 w-3.5" strokeWidth={2} />
-              Abonnements
-            </Link>
-          </td>
         </tr>
       )}
     />

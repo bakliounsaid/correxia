@@ -85,13 +85,7 @@ export default async function AbonnementEnseignantPage({
         <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
           Abonnement enseignant
         </h1>
-        <p className="mt-1 text-gray-500">
-          Compte individuel — packs Avancé et Maîtrise. Le pack gratuit Essentiel reste disponible à{" "}
-          <a href="/register" className="font-medium text-primary-600 hover:text-primary-700">
-            l’inscription
-          </a>
-          .
-        </p>
+        <p className="mt-1 text-gray-500">Compte individuel</p>
       </header>
 
       <TeacherAbonnementClient

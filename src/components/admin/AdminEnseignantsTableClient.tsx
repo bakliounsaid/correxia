@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   SelectableExportTable,
@@ -41,7 +39,7 @@ export function AdminEnseignantsTableClient({
       exportColumns={exportColumns}
       fileBaseName="admin-enseignants"
       sheetName="Enseignants"
-      minWidthClass="min-w-[880px]"
+      minWidthClass="min-w-[760px]"
       toolbarLeft={toolbarLeft}
       headerCells={
         <>
@@ -51,7 +49,6 @@ export function AdminEnseignantsTableClient({
           <th className="px-6 py-3">Plan</th>
           <th className="px-6 py-3">Profil</th>
           <th className="px-6 py-3">Inscrit le</th>
-          <th className="px-6 py-3">Action</th>
         </>
       }
       renderRow={({ row, selectCell }) => (
@@ -72,15 +69,6 @@ export function AdminEnseignantsTableClient({
           </td>
           <td className="px-6 py-4 text-gray-600">{row.profilLabel}</td>
           <td className="px-6 py-4 text-gray-600">{row.createdLabel}</td>
-          <td className="px-6 py-4">
-            <Link
-              href="/admin/subscriptions"
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary-500 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-600"
-            >
-              <Eye className="h-3.5 w-3.5" strokeWidth={2} />
-              Abonnements
-            </Link>
-          </td>
         </tr>
       )}
     />

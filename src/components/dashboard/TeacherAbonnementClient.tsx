@@ -146,10 +146,6 @@ export function TeacherAbonnementClient({
                 <span className="ml-2 text-xs text-gray-400">(Stripe actif)</span>
               ) : null}
             </p>
-            <p className="mt-2 text-sm text-gray-600">
-              Le pack gratuit Essentiel n’apparaît pas dans la mise à niveau : seuls les packs{" "}
-              <strong>Avancé</strong> et <strong>Maîtrise</strong> sont proposés ici.
-            </p>
           </div>
           <Button
             type="button"

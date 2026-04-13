@@ -48,7 +48,7 @@ export function AdminSidebar({ displayName, subtitle, initials }: Props) {
   }
 
   return (
-    <aside className="w-full shrink-0 border-b border-gray-200 bg-white md:flex md:h-full md:w-[260px] md:flex-col md:border-b-0 md:border-r">
+    <aside className="flex w-full shrink-0 flex-col border-b border-gray-200 bg-white md:min-h-[100dvh] md:w-[260px] md:border-b-0 md:border-r">
       <div className="hidden items-start gap-3 px-5 py-6 md:flex">
         <CorrexiaLogo size={36} />
         <div>

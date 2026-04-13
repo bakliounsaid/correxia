@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { memo, useMemo, useState } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Send } from "lucide-react";
 import Swal from "sweetalert2";
 import { Button } from "@/components/ui/Button";
 
@@ -21,6 +21,8 @@ type Props = {
   aiConfidence: number | null;
   aiFeedback: string;
   aiPerExercise: Array<{ label: string; score: number; max: number; comment?: string }>;
+  /** Zones peu lisibles ou notation fragile — à contrôler sur l’image de la copie. */
+  passagesAVerifier?: Array<{ zone: string; detail: string; source?: string }>;
   validatedScore: number | null;
   /** Vue intégrée (overlay) : barre d’action en bas, pas de navigation pleine page */
   variant?: "page" | "modal";
@@ -38,6 +40,17 @@ function clampLocal(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function buildClampedPerExercise(
+  rows: Props["aiPerExercise"],
+): Array<{ label: string; score: number; max: number; comment: string }> {
+  return rows.map((x) => ({
+    label: x.label,
+    score: clampLocal(Number(x.score || 0), 0, x.max || 20),
+    max: x.max,
+    comment: x.comment || "",
+  }));
+}
+
 function statusLabelFr(status: string) {
   const s = (status || "").toLowerCase();
   if (s === "created") return "Créée";
@@ -50,18 +63,16 @@ function statusLabelFr(status: string) {
 
 function CopyReviewWorkspaceInner(props: Props) {
   const isModal = props.variant === "modal";
-  const [score, setScore] = useState<number>(props.validatedScore ?? props.aiScore ?? 0);
+  const [perExercise, setPerExercise] = useState(() => buildClampedPerExercise(props.aiPerExercise));
+  const [score, setScore] = useState<number>(() => {
+    if (props.validatedScore != null) return props.validatedScore;
+    const clamped = buildClampedPerExercise(props.aiPerExercise);
+    if (clamped.length > 0) return clamped.reduce((s, x) => s + x.score, 0);
+    return props.aiScore ?? 0;
+  });
   const [feedback, setFeedback] = useState("");
   const [comments, setComments] = useState("");
   const [saving, setSaving] = useState(false);
-  const [perExercise, setPerExercise] = useState(
-    props.aiPerExercise.map((x) => ({
-      label: x.label,
-      score: x.score,
-      max: x.max,
-      comment: x.comment || "",
-    })),
-  );
 
   const changed = useMemo(() => {
     if (props.aiScore == null) return true;
@@ -206,6 +217,30 @@ function CopyReviewWorkspaceInner(props: Props) {
           <p className="text-xs text-gray-500">
             Basée sur la lisibilité et la clarté de la copie (si écriture floue/ambiguë, la précision baisse).
           </p>
+          {props.passagesAVerifier && props.passagesAVerifier.length > 0 ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/90 p-3 text-amber-950">
+              <p className="flex items-start gap-2 text-sm font-semibold leading-snug">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden />
+                À relire sur la copie (réponses peu lisibles ou interprétation fragile)
+              </p>
+              <ul className="mt-2 list-none space-y-2 text-xs leading-relaxed">
+                {props.passagesAVerifier.map((p, i) => (
+                  <li
+                    key={`${p.zone}-${i}`}
+                    className="rounded-md border border-amber-100/80 bg-white/60 px-2.5 py-1.5"
+                  >
+                    <span className="font-medium text-amber-950">{p.zone}</span>
+                    <span className="text-amber-900/90"> — {p.detail}</span>
+                    {p.source ? (
+                      <span className="mt-0.5 block text-[10px] font-normal uppercase tracking-wide text-amber-800/70">
+                        {p.source === "ocr" ? "Transcription" : p.source === "notation" ? "Notation" : p.source}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <p>
             <strong>Analyse IA :</strong> {props.aiFeedback || "—"}
           </p>

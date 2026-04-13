@@ -1,6 +1,49 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { getTeacherId } from "@/lib/teacher-context";
+import { buildMathAssistHints, subjectUsesMathAssist } from "@/lib/math-correction-hints";
+
+type ServerSupabase = ReturnType<typeof createSupabaseServerClient>;
+
+/** Extrait le chemin storage du bucket `tests` depuis une URL publique ou signée Supabase. */
+function getTestsStoragePathFromPublicUrl(fileUrl: string): string | null {
+  try {
+    const url = new URL(fileUrl);
+    const markers = ["/object/public/tests/", "/object/sign/tests/"];
+    for (const marker of markers) {
+      const idx = url.pathname.indexOf(marker);
+      if (idx >= 0) {
+        return decodeURIComponent(url.pathname.slice(idx + marker.length));
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * OpenAI télécharge l’URL depuis ses serveurs : une URL « publique » Supabase peut être 403 si le bucket est privé.
+ * On génère une URL signée avec la session enseignant pour que le téléchargement réussisse.
+ */
+async function resolveVisionImageUrl(fileUrl: string, supabase: ServerSupabase): Promise<string> {
+  const path = getTestsStoragePathFromPublicUrl(fileUrl);
+  if (!path) return fileUrl;
+  const { data, error } = await supabase.storage.from("tests").createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) return fileUrl;
+  return data.signedUrl;
+}
+
+function isLikelyPdfUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return /\.pdf(\?|#|$)/i.test(u.pathname);
+  } catch {
+    return /\.pdf/i.test(url);
+  }
+}
+
+type RevisionPassage = { zone: string; detail: string };
 
 type CorrectionResult = {
   score: number;
@@ -9,26 +52,135 @@ type CorrectionResult = {
   perExercise: Array<{ label: string; score: number; max: number; comment?: string }>;
   hasContent: boolean;
   contentDensity: number;
+  /** Zones où la note repose sur une interprétation fragile (complète l’OCR). */
+  notationIncertaine: RevisionPassage[];
 };
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeRevisionPassages(raw: unknown): RevisionPassage[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RevisionPassage[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const zone = String(o.zone ?? o.location ?? o.where ?? o.exercice ?? "").trim();
+    const detail = String(o.detail ?? o.note ?? o.reason ?? o.description ?? "").trim();
+    if (!zone && !detail) continue;
+    out.push({ zone: zone || "Copie", detail: detail || zone });
+  }
+  return out;
+}
+
+function dedupePassages<T extends { zone: string; detail: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const it of items) {
+    const k = `${it.zone.trim()}\n${it.detail.trim()}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    result.push(it);
+  }
+  return result;
+}
+
+type PerExerciseRow = { label: string; score: number; max: number; comment: string };
+
+/**
+ * Le modèle attribue parfois la note max tout en décrivant une erreur dans le commentaire.
+ * On borne la note si le texte contredit une attribution pleine.
+ */
+const COMMENT_INDICATE_ERREUR = new RegExp(
+  [
+    "erreur\\s+(de|d'|dans|sur|aux?)",
+    "erreurs\\s+",
+    "incorrect",
+    "incorrecte",
+    "erroné",
+    "erronée",
+    "faux",
+    "fausse",
+    "n['’]est pas",
+    "ne sont pas",
+    "pas correct",
+    "pas juste",
+    "invalide",
+    "mauvais",
+    "mauvaise",
+    "mal interpr",
+    "interprétation.{0,60}(incorrect|erron|faus)",
+    "conclusion.{0,50}(faus|incorrect|erron)",
+    "ne convient pas",
+    "inadéquat",
+  ].join("|"),
+  "i",
+);
+
+function commentSuggestsPenaltyAtFullScore(comment: string): boolean {
+  const c = comment.trim();
+  if (!c || !COMMENT_INDICATE_ERREUR.test(c)) return false;
+  if (/(sans|aucune|pas\s+d['’])\s+erreur/i.test(c) && !/\bmais\b/i.test(c)) return false;
+  return true;
+}
+
+function roundQuarter(n: number): number {
+  return Math.round(n * 4) / 4;
+}
+
+/** Si note = max et commentaire négatif → plafond ~70 % du max (jamais plein pot avec erreur explicite). */
+function reconcileScoreWithCommentCritique(items: PerExerciseRow[]): {
+  rows: PerExerciseRow[];
+  adjusted: boolean;
+} {
+  let adjusted = false;
+  const rows = items.map((e) => {
+    if (e.max <= 0) return e;
+    const atFull = e.score >= e.max - 1e-6;
+    if (!atFull) return e;
+    const c = (e.comment || "").trim();
+    if (!c || !commentSuggestsPenaltyAtFullScore(c)) return e;
+    const cap = roundQuarter(e.max * 0.7);
+    const newScore = clamp(Math.min(e.score, cap), 0, e.max);
+    if (Math.abs(newScore - e.score) > 1e-6) adjusted = true;
+    return { ...e, score: newScore };
+  });
+  return { rows, adjusted };
+}
+
+const OCR_MODEL = process.env.OPENAI_OCR_MODEL ?? "gpt-4o";
+const GRADE_MODEL = process.env.OPENAI_GRADE_MODEL ?? "gpt-4o-mini";
+
 const ACADEMIC_CORRECTION_PROTOCOL = [
-  "Agis en tant qu'expert en correction académique spécialisé dans l'analyse de documents manuscrits.",
-  "Objectif: extraire le contenu de la copie via OCR puis appliquer une logique de correction rigoureuse basée exclusivement sur le barème et les réponses types fournis.",
-  "Pour chaque question, décompose l'analyse en 3 étapes:",
-  "1) identifier les étapes de raisonnement présentes dans la copie,",
-  "2) comparer aux solutions de référence,",
-  "3) attribuer les points proportionnellement en respectant les pénalités (erreur de calcul vs erreur de méthode).",
-  "En cas d'ambiguïté OCR sur un chiffre/symbole, utiliser le contexte scientifique pour vérifier la cohérence avant de noter.",
-  "Produire un feedback structuré justifiant chaque point retiré, pour une transparence totale du curseur de notation.",
+  "Tu es un expert en correction de copies scientifiques (maths, physique, sciences).",
+  "Objectif: transcription fidèle du manuscrit puis notation strictement alignée sur le barème et la correction type fournis.",
+  "Pour chaque exercice: (1) lister ce que l'élève a réellement écrit ou calculé, (2) comparer à la référence, (3) attribuer les points selon le barème (méthode, justesse, résultat).",
+  "Distingue clairement: erreur de calcul mineure, erreur de méthode, réponse incomplète, notation juste mais mal rédigée.",
+  "Si l'OCR est ambigu sur un symbole ou un chiffre, ne pas inventer: signaler l'incertitude et pénaliser prudemment ou baisser la confidence.",
+  "Feedback: phrases courtes, factuelles, point par point (ce qui est acquis / ce qui manque / l'erreur précise).",
+].join("\n");
+
+const OCR_INSTRUCTIONS = [
+  "Mission: OCR haute fidélité pour correction ultérieure. Réponse = un seul objet JSON valide.",
+  "La feuille contient du texte imprimé (énoncé): IGNORE tout le texte clairement imprimé du sujet.",
+  "Extrais UNIQUEMENT l'écriture manuscrite de l'élève: calculs, réponses, schémas annotés, ratures visibles.",
+  "Transcris dans l'ordre de lecture (haut → bas). Pour chaque exercice du sujet, commence une section:",
+  "=== Exercice N ===",
+  "Symboles maths: restitue fidèlement + − × ÷ = < > ≤ ≥ √ ^ Δ π Σ ∫, fractions en ligne (a+b)/c ou a/b, exposants ^n si lisibles.",
+  "Pour les calculs, privilégie une forme exploitable: exposants en ^2, ^3, racines sqrt(...), constante pi, multiplication explicite 3*(-2) si ambigu.",
+  "Ne complète pas une démarche manquante. Si illisible: [illisible] ou (?). Ne déduis pas un chiffre douteux du seul contexte.",
+  "Si aucune trace manuscrite utile: has_content=false, text vide, legibility basse.",
+  "Format JSON strict:",
+  '{"text": string, "legibility": number, "has_content": boolean, "content_density": number, "ocr_notes": string, "unreadable_parts": [{"zone": string, "detail": string}]}',
+  "unreadable_parts: tableau vide si tout est lisible. Sinon une entrée par problème: zone = repère (ex. \"Exercice 2\", \"marge droite\"), detail = ce qui n’a pas pu être transcrit fidèlement (barré, flou, coupé…).",
+  "ocr_notes: une phrase globale sur la qualité du scan ou chaîne vide.",
+  "legibility, content_density ∈ [0,1].",
 ].join("\n");
 
 async function ocrFromImageWithAi(imageUrl: string, apiKey: string, printedTemplateText: string) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeout = setTimeout(() => controller.abort(), 55_000);
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -38,7 +190,7 @@ async function ocrFromImageWithAi(imageUrl: string, apiKey: string, printedTempl
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: OCR_MODEL,
         temperature: 0,
         response_format: { type: "json_object" },
         messages: [
@@ -48,43 +200,58 @@ async function ocrFromImageWithAi(imageUrl: string, apiKey: string, printedTempl
               {
                 type: "text",
                 text: [
-          ACADEMIC_CORRECTION_PROTOCOL,
-          "",
-                  "Fais une extraction OCR orientée correction et réponds strictement en JSON.",
-                  "IMPORTANT: la feuille contient le sujet imprimé. IGNORE ce texte imprimé.",
-                  "Ne conserve que le contenu ajouté par l'élève (écriture manuscrite/annotations/calculs).",
-                  "Si tu ne détectes aucun ajout élève net, has_content=false et text vide.",
-                  "Format: {\"text\": string, \"legibility\": number, \"has_content\": boolean, \"content_density\": number}",
-                  "legibility entre 0 et 1 (qualité de lecture).",
-                  "has_content=false si copie vide/quasi vide.",
-                  "content_density entre 0 et 1.",
+                  ACADEMIC_CORRECTION_PROTOCOL,
                   "",
-                  "Texte imprimé de référence à exclure:",
+                  OCR_INSTRUCTIONS,
+                  "",
+                  "Texte imprimé du sujet (à ne PAS recopier comme production élève):",
                   printedTemplateText.slice(0, 12000),
                 ].join("\n"),
               },
-              { type: "image_url", image_url: { url: imageUrl } },
+              { type: "image_url", image_url: { url: imageUrl, detail: "high" } },
             ],
           },
         ],
       }),
     });
+    const raw = await res.text();
     if (!res.ok) {
-      throw new Error(`Erreur OCR IA (${res.status})`);
+      let detail = raw.slice(0, 320).replace(/\s+/g, " ").trim();
+      try {
+        const j = JSON.parse(raw) as { error?: { message?: string } };
+        if (j?.error?.message) detail = j.error.message.slice(0, 320);
+      } catch {
+        /* garder detail brut */
+      }
+      throw new Error(
+        detail ? `Erreur OCR IA (${res.status}): ${detail}` : `Erreur OCR IA (${res.status})`,
+      );
     }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const data = JSON.parse(raw) as { choices?: Array<{ message?: { content?: string } }> };
     const content = data.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content) as {
       text?: string;
       legibility?: number;
       has_content?: boolean;
       content_density?: number;
+      ocr_notes?: string;
+      unreadable_parts?: unknown;
     };
+    const baseText = String(parsed.text ?? "").trim();
+    const notes = String(parsed.ocr_notes ?? "").trim();
+    const unreadableNormalized = normalizeRevisionPassages(parsed.unreadable_parts);
+    const combined =
+      notes && baseText
+        ? `${baseText}\n\n[Notes OCR: ${notes}]`
+        : notes && !baseText
+          ? `[Notes OCR: ${notes}]`
+          : baseText;
     return {
-      text: String(parsed.text ?? "").trim(),
+      text: combined,
       legibility: clamp(Number(parsed.legibility ?? 0.5), 0, 1),
       hasContent: Boolean(parsed.has_content),
       contentDensity: clamp(Number(parsed.content_density ?? 0.5), 0, 1),
+      unreadableParts: unreadableNormalized,
     };
   } finally {
     clearTimeout(timeout);
@@ -94,11 +261,14 @@ async function ocrFromImageWithAi(imageUrl: string, apiKey: string, printedTempl
 async function gradeWithAiText(
   studentText: string,
   correctionText: string,
+  rubricAndQuestionsBlock: string,
   totalPoints: number,
   subject: string,
   legibility: number,
   hasContent: boolean,
   contentDensity: number,
+  ocrUnreadableParts: RevisionPassage[],
+  mathAssistHints: string,
 ): Promise<CorrectionResult> {
   const subjectKey = (subject || "").toLowerCase();
   const subjectGuidelines =
@@ -121,7 +291,7 @@ async function gradeWithAiText(
   if (!apiKey) throw new Error("OPENAI_API_KEY manquante.");
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), 55_000);
 
   try {
     const userContent: Array<
@@ -132,34 +302,49 @@ async function gradeWithAiText(
         text: [
           ACADEMIC_CORRECTION_PROTOCOL,
           "",
-          "Tu es un correcteur scolaire.",
-          "IMPORTANT: n'exige PAS une réponse identique mot à mot.",
-          "Accepte les méthodes différentes si elles sont mathématiquement/scientifiquement valides.",
-          "Évalue le raisonnement, la cohérence des étapes, et le résultat final.",
-          "Accorde du crédit partiel quand la démarche est correcte mais incomplète.",
-          "N'applique une forte pénalité que sur les erreurs conceptuelles majeures.",
-          "Si la forme diffère mais le fond est juste, la note doit rester élevée.",
-          `Barème total: ${totalPoints} points.`,
+          "Tu corriges comme en contrôle classique: précis, motivé, sans généralités vagues.",
+          "N'exige pas une copie conforme mot à mot à la correction type si la démarche et le résultat sont valides.",
+          "En revanche, sois strict sur: erreurs de définition, erreurs de raisonnement, résultats faux, unités incohérentes, réponses hors sujet.",
+          "Accorde des demi-points ou quarts de barème quand c'est pertinent; cite l'exigence du barème dans le commentaire d'exercice.",
+          `Barème total de l'évaluation: ${totalPoints} points (la somme des \"max\" dans per_exercise doit rejoindre ce total).`,
           `Matière: ${subject || "math"}.`,
-          `Lisibilité OCR détectée: ${Math.round(legibility * 100)}%`,
-          `has_content: ${hasContent ? "true" : "false"}, content_density: ${contentDensity}`,
+          `Lisibilité OCR (fiabilité transcription): ${Math.round(legibility * 100)}%.`,
+          `has_content (pipeline): ${hasContent ? "true" : "false"}, content_density: ${contentDensity}.`,
+          "Si la transcription contient [illisible] ou (?), intègre ce doute: ne pas sur-pénaliser un passage illisible, mais baisse confidence.",
           subjectGuidelines,
-          "Réponds strictement en JSON: {\"score\": number, \"confidence\": number, \"feedback\": string, \"per_exercise\": [{\"label\": string, \"score\": number, \"max\": number, \"comment\": string}], \"has_content\": boolean, \"content_density\": number}",
-          "confidence entre 0 et 1.",
-          "Définition de confidence: pourcentage de lisibilité/compréhension de la copie élève.",
-          "Si l'écriture est floue, incomplète, ambiguë ou illisible, baisse nettement confidence.",
-          "Si la copie est claire et facilement lisible, confidence doit être élevée.",
-          "has_content = false si la copie est vide ou quasi vide (hors en-tête).",
-          "content_density entre 0 et 1 (0 = vide, 1 = très rempli).",
-          "Si has_content=false ou content_density<0.1: score doit être très faible (0 à 2/20).",
-          "feedback: 2-4 phrases, expliquant forces/faiblesses sans comparaison littérale de texte.",
-          "per_exercise: une ligne par exercice avec score/max.",
           "",
-          "Correction type OCR/texte:",
+          "Référence officielle — questions + barème (respecte les points max par exercice):",
+          rubricAndQuestionsBlock.slice(0, 14000),
+          "",
+          "Correction type (référence rédigée / OCR):",
           correctionText.slice(0, 12000),
           "",
-          "Copie élève OCR:",
+          "Copie élève (transcription OCR structurée Exercice 1, 2…):",
           studentText.slice(0, 12000),
+          "",
+          ...(mathAssistHints
+            ? [
+                "Recoupement calculatoire automatique (bibliothèque mathjs sur le texte OCR — peut être faux si l’OCR est mauvais; la copie image reste la vérité):",
+                mathAssistHints.slice(0, 6000),
+                "",
+              ]
+            : []),
+          "Passages déjà signalés comme peu lisibles par l’étape OCR (à reprendre dans notation_incertaine si la note en dépend encore):",
+          JSON.stringify(ocrUnreadableParts.slice(0, 40)),
+          "",
+          "Réponds en JSON strict:",
+          '{"score": number, "confidence": number, "feedback": string, "per_exercise": [{"label": string, "score": number, "max": number, "comment": string}], "has_content": boolean, "content_density": number, "notation_incertaine": [{"zone": string, "detail": string}]}',
+          "Règles:",
+          "- per_exercise: un objet par exercice du barème ci-dessus; chaque \"max\" = points prévus au barème pour cet exercice.",
+          "- INTERDIT: pour tout exercice, score > max ou score < 0. Exemple invalide: 7/6. Chaque score doit être compris entre 0 et max inclus.",
+          "- score (total) = somme des score de per_exercise (après respect des max); doit aussi être ≤ au barème total de l’évaluation.",
+          "- comment: 1-3 phrases, ce qui est juste / faux / manquant, en référence au contenu élève (pas générique).",
+          "- COHÉRENCE NOTE / COMMENTAIRE (obligatoire): si le commentaire d’un exercice signale une erreur, une conclusion fausse, une interprétation incorrecte ou une méthode invalide, la note de CET exercice NE PEUT PAS être le maximum. Réserve au moins 25–50 % des points selon la gravité.",
+          "- Exemple INTERDIT: « interprétation de l’angle erronée » ou « conclusion fausse » avec 6/6. Dans ce cas la note doit baisser (ex. 3–5/6 selon le barème partiel).",
+          "- confidence 0-1: ta certitude sur la justesse de la correction compte tenu de l'OCR.",
+          "- notation_incertaine: [] si tout est clair. Sinon une entrée par zone où l’enseignant doit relire la copie (ex. zone=\"Exercice 3\", detail=\"la note dépend d’un symbole ambigu dans la transcription\"). Ne duplique pas inutilement l’OCR si déjà couvert.",
+          "- Si des indices mathjs contredisent ton interprétation du texte OCR, privilégie la cohérence avec l’énoncé et baisse confidence; l’image papier prime toujours sur le texte.",
+          "- Si copie vide ou quasi vide: has_content false, score quasi nul, feedback explicite.",
         ].join("\n"),
       },
     ];
@@ -172,8 +357,8 @@ async function gradeWithAiText(
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        temperature: 0.1,
+        model: GRADE_MODEL,
+        temperature: 0,
         response_format: { type: "json_object" },
         messages: [{ role: "user", content: userContent }],
       }),
@@ -193,6 +378,7 @@ async function gradeWithAiText(
       per_exercise?: Array<{ label?: string; score?: number; max?: number; comment?: string }>;
       has_content?: boolean;
       content_density?: number;
+      notation_incertaine?: unknown;
     } = {};
     try {
       parsed = JSON.parse(content) as {
@@ -202,30 +388,45 @@ async function gradeWithAiText(
         per_exercise?: Array<{ label?: string; score?: number; max?: number; comment?: string }>;
         has_content?: boolean;
         content_density?: number;
+        notation_incertaine?: unknown;
       };
     } catch {
       parsed = {};
     }
+    const notationIncertaine = normalizeRevisionPassages(parsed.notation_incertaine);
     const perExerciseRaw = Array.isArray(parsed.per_exercise) ? parsed.per_exercise : [];
-    const perExercise = perExerciseRaw
+    let perExercise: PerExerciseRow[] = perExerciseRaw
       .map((e, i) => ({
         label: String(e.label ?? `Exercice ${i + 1}`),
         score: Number(e.score ?? 0),
         max: Number(e.max ?? 0),
         comment: e.comment ? String(e.comment) : "",
       }))
-      .filter((e) => e.max > 0);
+      .filter((e) => e.max > 0)
+      .map((e) => ({
+        ...e,
+        score: clamp(e.score, 0, e.max),
+      }));
+    const { rows: reconciled, adjusted: scoreCommentMismatchFixed } =
+      reconcileScoreWithCommentCritique(perExercise);
+    perExercise = reconciled;
     const perSum = perExercise.reduce((s, e) => s + e.score, 0);
+    const modelTotal = clamp(Number(parsed.score ?? 0), 0, totalPoints);
+    const rawScore =
+      perExercise.length > 0 ? clamp(perSum, 0, totalPoints) : modelTotal;
     const coherencePenalty =
       perExercise.length > 0
-        ? Math.min(0.25, Math.abs(perSum - Number(parsed.score ?? 0)) / Math.max(1, totalPoints))
+        ? Math.min(0.25, Math.abs(perSum - rawScore) / Math.max(1, totalPoints))
         : 0;
     const hasContentModel = Boolean(parsed.has_content);
     const contentDensityModel = clamp(Number(parsed.content_density ?? contentDensity), 0, 1);
     const lowContent = !hasContent || !hasContentModel || contentDensityModel < 0.1;
-    const rawScore = clamp(Number(parsed.score ?? 0), 0, totalPoints);
     const guardedScore = lowContent ? 0 : rawScore;
-    const rawConfidence = clamp(Number(parsed.confidence ?? 0.5) - coherencePenalty, 0, 1);
+    const rawConfidence = clamp(
+      Number(parsed.confidence ?? 0.5) - coherencePenalty - (scoreCommentMismatchFixed ? 0.05 : 0),
+      0,
+      1,
+    );
     const legibilityCap = Math.max(0.15, legibility);
     const guardedConfidence = lowContent
       ? Math.min(rawConfidence, 0.35, legibilityCap)
@@ -240,6 +441,7 @@ async function gradeWithAiText(
       perExercise,
       hasContent: hasContent && hasContentModel,
       contentDensity: contentDensityModel,
+      notationIncertaine,
     };
   } finally {
     clearTimeout(timeout);
@@ -300,6 +502,13 @@ export async function POST(
     "Sujet imprimé (questions):",
     JSON.stringify(test.questions ?? [], null, 2),
   ].join("\n");
+  const rubricAndQuestionsBlock = [
+    "Questions (structure officielle):",
+    JSON.stringify(test.questions ?? [], null, 2),
+    "",
+    "Barème / rubrique (points par exercice — à respecter pour les champs max):",
+    JSON.stringify(test.rubric ?? [], null, 2),
+  ].join("\n");
   const correctionImageUrl = isLikelyImageUrl(test.correction_file_url as string | null)
     ? (test.correction_file_url as string)
     : null;
@@ -310,7 +519,8 @@ export async function POST(
   let correctionOcrText = "";
   if (correctionImageUrl) {
     try {
-      const corrOcr = await ocrFromImageWithAi(correctionImageUrl, apiKey, "");
+      const resolvedCorr = await resolveVisionImageUrl(correctionImageUrl, supabase);
+      const corrOcr = await ocrFromImageWithAi(resolvedCorr, apiKey, "");
       correctionOcrText = corrOcr.text;
     } catch {
       correctionOcrText = "";
@@ -322,20 +532,34 @@ export async function POST(
 
   for (const cp of candidates) {
     try {
-      const studentOcr = await ocrFromImageWithAi(
-        cp.scanned_image_url as string,
-        apiKey,
-        printedTemplateText,
-      );
+      const scanUrl = cp.scanned_image_url as string;
+      if (isLikelyPdfUrl(scanUrl)) {
+        throw new Error(
+          "Fichier PDF : l’OCR attend une image (JPG ou PNG). Réimportez une photo ou un scan exporté en image, pas en PDF.",
+        );
+      }
+      const resolvedScan = await resolveVisionImageUrl(scanUrl, supabase);
+      const studentOcr = await ocrFromImageWithAi(resolvedScan, apiKey, printedTemplateText);
+      const subjectStr = String(test.subject ?? "math");
+      const mathAssistHints = subjectUsesMathAssist(subjectStr)
+        ? buildMathAssistHints(studentOcr.text)
+        : "";
       const grading = await gradeWithAiText(
         studentOcr.text,
         correctionReferenceText,
+        rubricAndQuestionsBlock,
         totalPoints,
-        String(test.subject ?? "math"),
+        subjectStr,
         studentOcr.legibility,
         studentOcr.hasContent,
         studentOcr.contentDensity,
+        studentOcr.unreadableParts,
+        mathAssistHints,
       );
+      const passagesAVerifier = dedupePassages([
+        ...studentOcr.unreadableParts.map((p) => ({ ...p, source: "ocr" as const })),
+        ...grading.notationIncertaine.map((p) => ({ ...p, source: "notation" as const })),
+      ]);
       const now = new Date().toISOString();
 
       const { error: upsertError } = await supabase.from("copy_corrections").upsert(
@@ -349,6 +573,7 @@ export async function POST(
             per_exercise: grading.perExercise,
             has_content: grading.hasContent,
             content_density: grading.contentDensity,
+            passages_a_verifier: passagesAVerifier,
           },
           ai_confidence_score: grading.confidence,
           ai_total_points: grading.score,

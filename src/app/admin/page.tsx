@@ -7,19 +7,8 @@ import {
   Wallet,
   UserPlus,
 } from "lucide-react";
-import Link from "next/link";
-import { AdminRecentSubscriptionsTableClient } from "@/components/admin/AdminRecentSubscriptionsTableClient";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { cn } from "@/lib/utils";
-
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function formatEuro(cents: number) {
   return (cents / 100).toLocaleString("fr-FR", {
@@ -44,7 +33,6 @@ export default async function AdminDashboardPage() {
     schoolsRes,
     studentsRes,
     activeSubsRes,
-    recentSubsRes,
     allSubsRes,
     teachersMonthRes,
     schoolsMonthRes,
@@ -56,13 +44,6 @@ export default async function AdminDashboardPage() {
       .from("subscriptions")
       .select("*", { count: "exact", head: true })
       .eq("status", "active"),
-    supabase
-      .from("subscriptions")
-      .select(
-        "id, plan_type, status, billing_period, price_cents, created_at",
-      )
-      .order("created_at", { ascending: false })
-      .limit(8),
     supabase.from("subscriptions").select("price_cents, status"),
     supabase
       .from("teachers")
@@ -78,7 +59,6 @@ export default async function AdminDashboardPage() {
   const schoolsTotal = schoolsRes.count ?? 0;
   const studentsTotal = studentsRes.count ?? 0;
   const activeSubsTotal = activeSubsRes.count ?? 0;
-  const recent = recentSubsRes.data ?? [];
   const allSubs = allSubsRes.data ?? [];
 
   const mrrCents = allSubs
@@ -89,22 +69,6 @@ export default async function AdminDashboardPage() {
     (a, s) => a + (s.price_cents ?? 0),
     0,
   );
-
-  const recentClientRows = recent.map((row) => ({
-    id: row.id as string,
-    export: {
-      plan: row.plan_type,
-      periode: row.billing_period,
-      statut: row.status,
-      montant_eur: ((row.price_cents ?? 0) / 100).toFixed(2),
-      cree_le: formatDate(row.created_at),
-    },
-    plan_type: row.plan_type,
-    billing_period: row.billing_period,
-    status: row.status,
-    priceEuros: ((row.price_cents ?? 0) / 100).toFixed(2),
-    createdLabel: formatDate(row.created_at),
-  }));
 
   const overviewStats = [
     {
@@ -233,42 +197,6 @@ export default async function AdminDashboardPage() {
           </div>
         ))}
       </div>
-
-      {recent.length === 0 ? (
-        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-card">
-          <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <h2 className="text-base font-semibold text-gray-900">
-              Derniers abonnements
-            </h2>
-            <Link
-              href="/admin/subscriptions"
-              className="text-sm font-medium text-primary-500 hover:text-primary-600"
-            >
-              Voir tout
-            </Link>
-          </div>
-          <p className="px-6 py-10 text-center text-sm text-gray-500">
-            Aucun abonnement enregistré pour le moment.
-          </p>
-        </div>
-      ) : (
-        <AdminRecentSubscriptionsTableClient
-          rows={recentClientRows}
-          toolbarLeft={
-            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <h2 className="text-base font-semibold text-gray-900">
-                Derniers abonnements
-              </h2>
-              <Link
-                href="/admin/subscriptions"
-                className="text-sm font-medium text-primary-500 hover:text-primary-600"
-              >
-                Voir tout
-              </Link>
-            </div>
-          }
-        />
-      )}
     </div>
   );
 }

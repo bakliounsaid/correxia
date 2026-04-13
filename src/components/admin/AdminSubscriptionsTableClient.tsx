@@ -9,7 +9,6 @@ import {
 
 export type AdminSubscriptionsRow = SelectableExportRow & {
   plan_type: string;
-  plan_name: string | null;
   typeLabel: string;
   billing_period: string;
   status: string;
@@ -21,9 +20,8 @@ export type AdminSubscriptionsRow = SelectableExportRow & {
 
 const exportColumns = [
   { key: "plan", header: "Plan" },
-  { key: "libelle", header: "Libellé" },
   { key: "type", header: "Type" },
-  { key: "periode", header: "Période" },
+  { key: "periode", header: "Durée (jours)" },
   { key: "statut", header: "Statut" },
   { key: "montant_eur", header: "Montant (€)" },
   { key: "debut", header: "Début" },
@@ -44,14 +42,13 @@ export function AdminSubscriptionsTableClient({
       exportColumns={exportColumns}
       fileBaseName="admin-abonnements"
       sheetName="Abonnements"
-      minWidthClass="min-w-[1000px]"
+      minWidthClass="min-w-[900px]"
       toolbarLeft={toolbarLeft}
       headerCells={
         <>
           <th className="px-6 py-3">Plan</th>
-          <th className="px-6 py-3">Libellé</th>
           <th className="px-6 py-3">Type</th>
-          <th className="px-6 py-3">Période</th>
+          <th className="px-6 py-3">Durée (jours)</th>
           <th className="px-6 py-3">Statut</th>
           <th className="px-6 py-3">Montant</th>
           <th className="px-6 py-3">Début</th>
@@ -63,7 +60,6 @@ export function AdminSubscriptionsTableClient({
         <tr key={row.id} className="border-b border-gray-50 last:border-0">
           {selectCell}
           <td className="px-6 py-4 font-medium text-gray-900">{row.plan_type}</td>
-          <td className="max-w-[160px] truncate px-6 py-4 text-gray-600">{row.plan_name ?? "—"}</td>
           <td className="px-6 py-4 text-gray-600">{row.typeLabel}</td>
           <td className="px-6 py-4 text-gray-600">{row.billing_period}</td>
           <td className="px-6 py-4">
