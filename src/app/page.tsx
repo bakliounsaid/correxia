@@ -117,7 +117,7 @@ const landingPosts = [
 ] as const;
 
 export const metadata: Metadata = {
-  title: "CORREXIA - Correction de copies assistée par IA",
+  title: "CORREX IA",
   description:
     "CORREXIA aide les enseignants de sciences a corriger plus vite: scan des copies, application du bareme, validation humaine et statistiques de classe.",
   alternates: {

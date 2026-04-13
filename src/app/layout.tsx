@@ -9,7 +9,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "CORREXIA — Correction assistée par IA",
+  title: "CORREX IA",
   description:
     "Plateforme de correction automatisée des copies pour les matières scientifiques.",
   icons: {
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "CORREXIA",
+    title: "CORREX IA",
     statusBarStyle: "default",
   },
 };
