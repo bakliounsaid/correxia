@@ -7,6 +7,7 @@ import Swal from "sweetalert2";
 import { ListExportButton } from "@/components/ui/ListExportButton";
 import { TableSelectCheckbox } from "@/components/ui/TableSelectCheckbox";
 import { useRowSelection } from "@/hooks/useRowSelection";
+import { omitId } from "@/lib/utils";
 
 export type EvaluationRow = {
   id: string;
@@ -153,7 +154,7 @@ export function EvaluationsManager({ initialRows }: Props) {
 
   const evaluationExportRows = useMemo(() => {
     const picked = getExportRows(evaluationExportRowsWithId, "id");
-    return picked.map(({ id: _id, ...r }) => r) as Record<string, unknown>[];
+    return picked.map((r) => omitId(r as Record<string, unknown>));
   }, [getExportRows, evaluationExportRowsWithId]);
 
   return (

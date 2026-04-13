@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ListExportButton } from "@/components/ui/ListExportButton";
 import { TableSelectCheckbox } from "@/components/ui/TableSelectCheckbox";
 import { useRowSelection } from "@/hooks/useRowSelection";
+import { omitId } from "@/lib/utils";
 
 type TeacherRow = {
   id: string;
@@ -337,7 +338,7 @@ export function TeachersManager({ initialTeachers, classOptions }: Props) {
 
   const teacherExportRows = useMemo(() => {
     const picked = getExportRows(teacherExportRowsWithId, "id");
-    return picked.map(({ id: _id, ...r }) => r) as Record<string, unknown>[];
+    return picked.map((r) => omitId(r as Record<string, unknown>));
   }, [getExportRows, teacherExportRowsWithId]);
 
   return (

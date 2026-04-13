@@ -5,6 +5,7 @@ import { useRowSelection } from "@/hooks/useRowSelection";
 import { ListExportButton } from "@/components/ui/ListExportButton";
 import { TableSelectCheckbox } from "@/components/ui/TableSelectCheckbox";
 import type { ExportColumn } from "@/lib/export-table";
+import { omitId } from "@/lib/utils";
 
 export type SelectableExportRow = {
   id: string;
@@ -61,7 +62,7 @@ export function SelectableExportTable<T extends SelectableExportRow>({
   );
 
   const rowsWithoutId = useMemo(
-    () => exportRowsForButton.map(({ id: _id, ...rest }) => rest) as Record<string, unknown>[],
+    () => exportRowsForButton.map((row) => omitId(row as Record<string, unknown>)),
     [exportRowsForButton],
   );
 

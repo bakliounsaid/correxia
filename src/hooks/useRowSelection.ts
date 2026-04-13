@@ -7,14 +7,10 @@ function rowIdKey(id: unknown): string {
 /**
  * Sélection de lignes pour tableaux + export.
  * Les id sont normalisés en string (évite décalage en-tête / lignes si Supabase renvoie un type ambigu).
- * La clé `idsKey` stabilise le Set quand le tableau `validIds` change de référence sans changer le contenu.
+ * `normalizedIds` est recalculé quand `validIds` change.
  */
 export function useRowSelection(validIds: readonly string[]) {
-  const idsKey = useMemo(
-    () => validIds.map(rowIdKey).join("\u0001"),
-    [validIds],
-  );
-  const normalizedIds = useMemo(() => validIds.map(rowIdKey), [idsKey]);
+  const normalizedIds = useMemo(() => validIds.map(rowIdKey), [validIds]);
   const validSet = useMemo(() => new Set(normalizedIds), [normalizedIds]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());

@@ -10,6 +10,7 @@ import { ListExportButton } from "@/components/ui/ListExportButton";
 import { PDF_QR_PNG_WIDTH_PX, PDF_QR_SIZE_MM } from "@/lib/qr-scan";
 import { TableSelectCheckbox } from "@/components/ui/TableSelectCheckbox";
 import { useRowSelection } from "@/hooks/useRowSelection";
+import { omitId } from "@/lib/utils";
 import { CopyReviewWorkspace } from "@/components/dashboard/CopyReviewWorkspace";
 
 export type EvaluationCopyRow = {
@@ -228,7 +229,7 @@ function EvaluationCopiesTableInner({
 
   const copyExportRows = useMemo(() => {
     const picked = getExportRows(copyExportRowsWithId, "id");
-    return picked.map(({ id: _id, ...rest }) => rest) as Record<string, unknown>[];
+    return picked.map((r) => omitId(r as Record<string, unknown>));
   }, [getExportRows, copyExportRowsWithId]);
 
   async function onDownload(row: EvaluationCopyRow) {
