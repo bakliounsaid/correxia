@@ -148,9 +148,6 @@ export function SchoolAbonnementClient({
                 <span className="ml-2 text-xs text-gray-400">(Stripe actif)</span>
               ) : null}
             </p>
-            <p className="mt-2 text-sm text-gray-600">
-              La démo gratuite ne figure pas ici : utilisez « Mettre à niveau » dans le menu pour choisir une offre payante ou sur devis.
-            </p>
           </div>
           <Button
             type="button"

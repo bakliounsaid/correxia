@@ -72,13 +72,7 @@ export default async function AbonnementEtablissementPage({
         <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
           Abonnement établissement
         </h1>
-        <p className="mt-1 text-gray-500">
-          {school.name} — offre actuelle et offres payantes. La démo gratuite reste accessible via{" "}
-          <a href="/register-school" className="font-medium text-primary-600 hover:text-primary-700">
-            inscription établissement
-          </a>
-          .
-        </p>
+        <p className="mt-1 text-gray-500">{school.name}</p>
       </header>
 
       <SchoolAbonnementClient
