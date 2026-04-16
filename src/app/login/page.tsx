@@ -6,18 +6,14 @@ type Props = {
   searchParams: { redirect?: string; error?: string };
 };
 
-export default function LoginPage({ searchParams }: Props) {
-  const adminRedirect =
-    typeof searchParams.redirect === "string" &&
-    searchParams.redirect.startsWith("/admin");
-
+export default function LoginPage({ searchParams: _searchParams }: Props) {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <div className="relative flex flex-1 flex-col justify-between bg-gradient-to-br from-[#6D28D9] via-[#7C3AED] to-[#A78BFA] px-8 py-10 text-white lg:max-w-[46%] lg:px-12">
         <div>
           <Link href="/" className="inline-flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur">
-              <CorrexiaLogo size={28} />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white">
+              <CorrexiaLogo variant="mark" size={28} priority />
             </div>
             <div>
               <p className="text-lg font-bold tracking-wide">CORREXIA</p>
@@ -57,22 +53,6 @@ export default function LoginPage({ searchParams }: Props) {
           <p className="mt-1 text-sm text-gray-500">
             Connectez-vous avec l&apos;email et le mot de passe de votre compte.
           </p>
-          {adminRedirect ? (
-            <p className="mt-3 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-sm text-primary-800">
-              Accès <strong>administration plateforme</strong> : après connexion,
-              vous serez redirigé vers le tableau de bord admin.
-            </p>
-          ) : (
-            <p className="mt-3 text-center text-sm text-gray-500">
-              <Link
-                href="/login?redirect=/admin"
-                className="font-medium text-primary-500 hover:text-primary-600"
-              >
-                Connexion administrateur plateforme
-              </Link>
-            </p>
-          )}
-
           <LoginForm />
         </div>
         <p className="mx-auto mt-8 max-w-md text-center text-xs text-gray-500">

@@ -4,11 +4,8 @@ import Link from "next/link";
 import {
   ArrowRight,
   BarChart3,
-  BookOpen,
-  CheckCircle2,
-  Leaf,
+  Clock3,
   ScanLine,
-  Shield,
   Sparkles,
 } from "lucide-react";
 import { CorrexiaLogo } from "@/components/brand/CorrexiaLogo";
@@ -134,18 +131,36 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: { lang?: string } | Promise<{ lang?: string }>;
+}) {
+  const params = searchParams ? await searchParams : undefined;
+  const lang = params?.lang === "en" ? "en" : "fr";
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   const isLoggedIn = Boolean(user);
   const primaryCtaHref = isLoggedIn ? "/dashboard" : "/register";
-  const primaryCtaLabel = isLoggedIn ? "Accéder au dashboard" : "Démarrer l'essai gratuit";
+  const primaryCtaLabel =
+    lang === "en"
+      ? isLoggedIn
+        ? "Go to dashboard"
+        : "Start free trial"
+      : isLoggedIn
+        ? "Accéder au dashboard"
+        : "Démarrer l'essai gratuit";
   const secondaryCtaHref = isLoggedIn ? "/dashboard" : "/register-school";
-  const secondaryCtaLabel = isLoggedIn
-    ? "Ouvrir mon espace"
-    : "Découvrir l'offre établissement";
+  const secondaryCtaLabel =
+    lang === "en"
+      ? isLoggedIn
+        ? "Open my workspace"
+        : "Discover school plan"
+      : isLoggedIn
+        ? "Ouvrir mon espace"
+        : "Découvrir l'offre établissement";
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -158,7 +173,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-[100dvh] bg-white text-gray-900">
-      <LandingHeader isLoggedIn={isLoggedIn} />
+      <LandingHeader isLoggedIn={isLoggedIn} lang={lang} />
       <script
         type="application/ld+json"
         // Schema.org aide les moteurs à mieux comprendre le produit.
@@ -181,12 +196,14 @@ export default async function HomePage() {
         />
         <div className="relative mx-auto max-w-4xl px-5 py-16 text-center md:py-24">
           <h1 className="text-balance text-4xl font-semibold leading-[1.15] tracking-tight text-gray-900 motion-reduce:animate-none animate-hero-fade-up md:text-5xl lg:text-[3.25rem]">
-            La correction de copies assistée par l&apos;IA, pour les enseignants de sciences
+            {lang === "en"
+              ? "AI-assisted grading for science teachers"
+              : "La correction de copies assistée par l'IA pour les professeurs de sciences"}
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 motion-reduce:animate-none animate-hero-fade-up hero-delay-1 md:text-xl">
-            CORREXIA analyse vos copies manuscrites, applique votre barème et propose
-            une correction que vous validez. Gagnez des heures chaque semaine sans
-            sacrifier l&apos;exigence pédagogique ni le retour personnalisé aux élèves.
+            {lang === "en"
+              ? "CORREXIA saves you valuable time by analyzing handwritten papers with your rubric, while the teacher keeps final validation and final decision."
+              : "CORREXIA vous fait gagner un temps précieux en analysant les copies manuscrites selon votre barème, tout en laissant au professeur la validation et la décision finale."}
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center motion-reduce:animate-none animate-hero-fade-up hero-delay-2">
@@ -201,15 +218,55 @@ export default async function HomePage() {
               href="#tarifs"
               className="inline-flex items-center justify-center rounded-full border-2 border-gray-300 px-8 py-4 text-base font-semibold text-gray-800 transition-all duration-300 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50/50"
             >
-              Voir les offres
+              {lang === "en" ? "View plans" : "Voir les offres"}
             </Link>
           </div>
         </div>
       </section>
 
+      {/* Chiffres clés */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-white via-secondary-50/45 to-white py-14 md:py-20">
+        <div
+          className="pointer-events-none absolute -left-16 top-0 h-44 w-44 rounded-full bg-primary-200/30 blur-3xl motion-reduce:animate-none animate-hero-glow"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -right-16 bottom-0 h-44 w-44 rounded-full bg-secondary-200/35 blur-3xl motion-reduce:animate-none animate-hero-glow"
+          style={{ animationDelay: "3s" }}
+          aria-hidden
+        />
+        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 px-5 md:grid-cols-4 md:gap-6">
+          {stats.map((s, i) => (
+            <Reveal key={s.label} delayMs={i * 80} className="text-center">
+              <div className="rounded-2xl border border-white/70 bg-white/90 py-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:scale-[1.03] hover:shadow-lg">
+                <StatCounter
+                  end={s.end}
+                  prefix={s.prefix}
+                  suffix={s.suffix}
+                  duration={1400}
+                  className="text-3xl font-bold text-primary-500 md:text-4xl"
+                />
+                <p className="mt-2 text-sm text-gray-600">{s.label}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
       {/* Features : 3 cartes style Examino */}
       <section className="bg-[#0a2a1a] px-5 py-16 md:py-24">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:gap-6">
+        <div className="mx-auto max-w-6xl">
+          <Reveal>
+            <h2 className="text-center text-3xl font-semibold tracking-tight text-white md:text-4xl">
+              Une plateforme pensée pour la correction scientifique
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-center text-primary-100">
+              Scannez, corrigez avec l&apos;IA, puis suivez les performances de
+              vos classes dans un seul espace.
+            </p>
+          </Reveal>
+
+          <div className="mt-12 flex flex-col gap-6 md:flex-row md:gap-6">
           {/* Carte 1 — Scan */}
           <Reveal className="flex flex-1" delayMs={0}>
             <div className="group flex h-full flex-1 flex-col rounded-[2rem] bg-[#fdfcf8] p-8 text-center transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-2xl md:p-10">
@@ -265,14 +322,80 @@ export default async function HomePage() {
               </p>
             </div>
           </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* Temps gagné */}
+      <section className="border-t border-gray-100 bg-white py-16 md:py-24">
+        <div className="mx-auto max-w-6xl px-5">
+          <Reveal>
+            <div className="mx-auto max-w-3xl text-center">
+              <h2 className="text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">
+                Combien de temps CORREXIA vous fait gagner
+              </h2>
+              <p className="mx-auto mt-4 max-w-2xl text-gray-600">
+                Réduisez drastiquement le temps de correction tout en gardant la
+                validation finale entre les mains du professeur.
+              </p>
+            </div>
+          </Reveal>
+
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
+            <Reveal>
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 md:p-8">
+                <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+                  Avant (manuel)
+                </p>
+                <p className="mt-3 text-3xl font-bold text-gray-900 md:text-4xl">
+                  10 à 15h / semaine
+                </p>
+                <ul className="mt-5 space-y-3 text-sm text-gray-600">
+                  <li>Correction ligne par ligne de chaque copie.</li>
+                  <li>Charge mentale élevée sur les périodes d’évaluation.</li>
+                  <li>Retour aux élèves souvent retardé.</li>
+                </ul>
+              </div>
+            </Reveal>
+
+            <Reveal delayMs={90}>
+              <div className="rounded-2xl border border-primary-200 bg-primary-50 p-6 shadow-sm md:p-8">
+                <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">
+                  Avec CORREXIA
+                </p>
+                <p className="mt-3 text-3xl font-bold text-primary-700 md:text-4xl">
+                  ~2 min / copie validée
+                </p>
+                <ul className="mt-5 space-y-3 text-sm text-primary-900/90">
+                  <li>L’IA pré-analyse selon votre barème.</li>
+                  <li>Vous validez, ajustez et publiez plus vite.</li>
+                  <li>Jusqu’à 10x plus rapide qu’une correction manuelle.</li>
+                </ul>
+              </div>
+            </Reveal>
+          </div>
+
+          <Reveal delayMs={140}>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 rounded-2xl border border-primary-100 bg-gradient-to-r from-primary-50 to-secondary-50 px-6 py-5 text-center sm:flex-row sm:text-left">
+              <Clock3 className="h-6 w-6 text-primary-600" />
+              <p className="text-sm text-gray-700">
+                Temps libéré estimé : plusieurs heures par semaine récupérées pour
+                l’accompagnement pédagogique et le suivi personnalisé.
+              </p>
+            </div>
+          </Reveal>
         </div>
       </section>
 
       {/* Témoignages */}
       <section
         id="temoignages"
-        className="border-y border-gray-100 bg-secondary-50/60 py-16 md:py-24"
+        className="relative overflow-hidden border-y border-gray-100 bg-secondary-50/60 py-16 md:py-24"
       >
+        <div
+          className="pointer-events-none absolute left-1/2 top-0 h-52 w-52 -translate-x-1/2 rounded-full bg-primary-200/25 blur-3xl motion-reduce:animate-none animate-hero-glow"
+          aria-hidden
+        />
         <div className="mx-auto max-w-6xl px-5">
           <Reveal>
             <h2 className="text-center text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">
@@ -296,7 +419,7 @@ export default async function HomePage() {
               return (
                 <Reveal key={t.author} delayMs={i * 80}>
                   <div
-                    className={`flex h-full flex-col rounded-2xl border border-gray-100 p-6 shadow-sm transition-all duration-300 hover:shadow-md md:p-8 ${accentStyles[accent] || accentStyles.primary}`}
+                    className={`flex h-full flex-col rounded-2xl border border-gray-100 p-6 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:shadow-xl md:p-8 ${accentStyles[accent] || accentStyles.primary}`}
                   >
                     <blockquote className="flex-1 text-base leading-relaxed text-gray-800 md:text-lg">
                       &laquo; {t.quote} &raquo;
@@ -314,65 +437,15 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Chiffres clés */}
-      <section className="py-14 md:py-20">
-        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 px-5 md:grid-cols-4 md:gap-6">
-          {stats.map((s, i) => (
-            <Reveal key={s.label} delayMs={i * 80} className="text-center">
-              <div className="rounded-2xl py-2 transition-transform duration-300 hover:scale-[1.03]">
-                <StatCounter
-                  end={s.end}
-                  prefix={s.prefix}
-                  suffix={s.suffix}
-                  duration={1400}
-                  className="text-3xl font-bold text-primary-500 md:text-4xl"
-                />
-                <p className="mt-2 text-sm text-gray-600">{s.label}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* Matières & capacités */}
-      <section className="border-t border-gray-100 bg-gray-50 py-16 md:py-24">
-        <Reveal className="mx-auto max-w-6xl px-5">
-          <h2 className="max-w-2xl text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">
-            Conçu pour les sciences au lycée
-          </h2>
-          <p className="mt-4 max-w-2xl text-gray-600">
-            Mathématiques, physique-chimie, sciences de la vie et de la Terre :
-            CORREXIA analyse les raisonnements, formules LaTeX, schémas et calculs,
-            en respectant vos critères d&apos;évaluation.
-          </p>
-          <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:max-w-3xl">
-            {[
-              "Analyser des calculs et chaînes de raisonnement",
-              "Prendre en compte formules, schémas et notations (dont LaTeX côté saisie)",
-              "Comparer au corrigé de référence et à votre barème personnalisé",
-              "Proposer des commentaires structurés pour vos retours élèves",
-            ].map((item) => (
-              <li key={item} className="flex gap-3 text-gray-700">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary-500" />
-                {item}
-              </li>
-            ))}
-          </ul>
-          <Link
-            href={primaryCtaHref}
-            className="mt-10 inline-flex items-center gap-2 rounded-full bg-primary-500 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-primary-600 hover:shadow-lg active:scale-[0.98]"
-          >
-            {primaryCtaLabel}
-            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-          </Link>
-        </Reveal>
-      </section>
+      <Reveal>
+        <PricingSection />
+      </Reveal>
 
       {/* Simplicité */}
       <section className="py-16 md:py-24">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-12 px-5 lg:flex-row lg:items-center lg:gap-16">
           <Reveal className="flex-1" delayMs={0}>
-            <div>
+            <div className="text-center">
               <h2 className="text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">
                 Un flux de travail adapté à votre pratique
               </h2>
@@ -384,7 +457,7 @@ export default async function HomePage() {
               </p>
               <Link
                 href={secondaryCtaHref}
-                className="mt-8 inline-flex items-center gap-2 rounded-full border-2 border-gray-900 px-6 py-3 text-sm font-semibold text-gray-900 transition-all duration-300 hover:bg-gray-900 hover:text-white active:scale-[0.98]"
+                className="mx-auto mt-8 inline-flex items-center gap-2 rounded-full border-2 border-gray-900 px-6 py-3 text-sm font-semibold text-gray-900 transition-all duration-300 hover:bg-gray-900 hover:text-white active:scale-[0.98]"
               >
                 {secondaryCtaLabel}
               </Link>
@@ -398,72 +471,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Qualité des évaluations */}
-      <section className="border-t border-gray-100 bg-primary-600 py-16 text-white md:py-24">
-        <div className="mx-auto flex max-w-6xl flex-col gap-10 px-5 lg:flex-row lg:items-center lg:gap-16">
-          <Reveal className="flex-1" delayMs={0}>
-            <div>
-              <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-                Objectivité et équité dans l&apos;évaluation
-              </h2>
-              <p className="mt-4 text-primary-100">
-                Un barème identique appliqué à toutes les copies réduit les biais
-                involontaires et les écarts entre correcteurs. Vous gardez le
-                contrôle : ajustements, commentaires personnalisés et validation
-                finale restent entre vos mains.
-              </p>
-              <Link
-                href={primaryCtaHref}
-                className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-primary-600 transition-all duration-300 hover:bg-primary-50 hover:shadow-lg active:scale-[0.98]"
-              >
-                {primaryCtaLabel}
-              </Link>
-            </div>
-          </Reveal>
-          <Reveal className="mt-10 w-full flex-1 lg:mt-0" delayMs={100}>
-            <div className="rounded-2xl bg-white/10 p-8 backdrop-blur-sm transition-all duration-500 hover:bg-white/15">
-              <BarChart3 className="h-12 w-12 text-white/90 motion-safe:animate-float" />
-              <p className="mt-4 text-sm text-primary-100">
-                Statistiques et exports pour vos bulletins et réunions
-                pédagogiques.
-              </p>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Responsable */}
-      <section className="py-16 md:py-24">
-        <Reveal className="mx-auto max-w-3xl px-5 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success-50 text-success-600 transition-transform duration-500 motion-safe:animate-float">
-            <Leaf className="h-7 w-7" />
-          </div>
-          <h2 className="mt-6 text-3xl font-semibold tracking-tight text-gray-900">
-            Une IA au service de la pédagogie
-          </h2>
-          <p className="mt-4 text-gray-600">
-            CORREXIA s&apos;engage sur la transparence de l&apos;usage de l&apos;IA,
-            la protection des données personnelles (RGPD) et la responsabilité de
-            l&apos;enseignant. L&apos;outil assiste la décision pédagogique, il ne
-            la remplace pas.
-          </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-6 text-sm text-gray-600">
-            <span className="inline-flex items-center gap-2">
-              <Shield className="h-4 w-4 text-primary-500" />
-              Données et accès sécurisés
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-primary-500" />
-              Équité & validation humaine
-            </span>
-          </div>
-        </Reveal>
-      </section>
-
-      <Reveal>
-        <PricingSection />
-      </Reveal>
-
       <Reveal>
         <ContactSection />
       </Reveal>
@@ -472,7 +479,7 @@ export default async function HomePage() {
       <section id="faq" className="py-16 md:py-20">
         <div className="mx-auto max-w-3xl px-5">
           <Reveal>
-            <h2 className="text-3xl font-semibold text-gray-900">
+            <h2 className="text-center text-3xl font-semibold text-gray-900">
               Questions fréquentes
             </h2>
           </Reveal>
@@ -492,35 +499,6 @@ export default async function HomePage() {
                     {item.a}
                   </p>
                 </details>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Articles (aperçu type blog) */}
-      <section className="border-t border-gray-100 bg-gray-50 py-16">
-        <div className="mx-auto max-w-6xl px-5">
-          <Reveal>
-            <h2 className="text-2xl font-semibold text-gray-900">
-              Ressources & actualités
-            </h2>
-          </Reveal>
-          <div className="mt-8 grid gap-6 md:grid-cols-3">
-            {landingPosts.map((post, i) => (
-              <Reveal key={post.title} delayMs={i * 90}>
-              <article
-                className="group h-full rounded-xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary-200 hover:shadow-lg"
-              >
-                <span className="text-xs font-semibold uppercase tracking-wide text-primary-600">
-                  {post.tag}
-                </span>
-                <h3 className="mt-2 font-semibold text-gray-900">{post.title}</h3>
-                <p className="mt-2 text-sm text-gray-600">{post.excerpt}</p>
-                <span className="mt-4 inline-block text-sm font-medium text-primary-500 transition-colors group-hover:text-primary-600">
-                  Bientôt disponible
-                </span>
-              </article>
               </Reveal>
             ))}
           </div>

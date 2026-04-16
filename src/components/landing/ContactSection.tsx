@@ -3,28 +3,61 @@
 import { useState } from "react";
 import { Loader2, Mail, Send } from "lucide-react";
 
+type RoleOption = "Enseignant" | "Responsable" | "Autres";
+
 export function ContactSection() {
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
+    setError(null);
+    setSent(false);
     try {
       const form = e.currentTarget;
       const email = (form.elements.namedItem("email") as HTMLInputElement)?.value;
       const subject = (form.elements.namedItem("subject") as HTMLSelectElement)?.value;
       const message = (form.elements.namedItem("message") as HTMLTextAreaElement)?.value;
       const name = (form.elements.namedItem("name") as HTMLInputElement)?.value;
+      const phone = (form.elements.namedItem("phone") as HTMLInputElement)?.value;
+      const role = (form.elements.namedItem("role") as HTMLSelectElement)?.value as RoleOption;
 
-      const mailto = `mailto:contact@correxia.fr?subject=${encodeURIComponent(subject || "Contact CORREXIA")}&body=${encodeURIComponent(
-        `Nom : ${name || "—"}\nEmail : ${email || "—"}\n\nMessage :\n${message || ""}`,
-      )}`;
-      window.location.href = mailto;
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          role,
+          subject,
+          message,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || "Envoi impossible pour le moment.");
+      }
+
       setSent(true);
+      form.reset();
     } finally {
-      window.setTimeout(() => setPending(false), 1500);
+      setPending(false);
     }
+  }
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    void handleSubmit(e).catch((err: unknown) => {
+      const fallback = "Envoi impossible pour le moment. Réessayez dans quelques instants.";
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : fallback;
+      setError(message || fallback);
+    });
   }
 
   return (
@@ -45,7 +78,7 @@ export function ContactSection() {
         </p>
 
         <form
-          onSubmit={handleSubmit}
+          onSubmit={onSubmit}
           className="mt-10 space-y-4 rounded-2xl border border-gray-200 bg-gray-50/50 p-6 md:p-8"
         >
           <div className="grid gap-4 sm:grid-cols-2">
@@ -81,6 +114,41 @@ export function ContactSection() {
                 className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-gray-400 focus:border-primary-300 focus:ring-2 focus:ring-primary-500/20"
               />
             </div>
+            <div>
+              <label
+                htmlFor="contact-phone"
+                className="block text-sm font-semibold text-gray-800"
+              >
+                Téléphone *
+              </label>
+              <input
+                id="contact-phone"
+                name="phone"
+                type="tel"
+                required
+                placeholder="+33 6 12 34 56 78"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-gray-400 focus:border-primary-300 focus:ring-2 focus:ring-primary-500/20"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="contact-role"
+                className="block text-sm font-semibold text-gray-800"
+              >
+                Fonction *
+              </label>
+              <select
+                id="contact-role"
+                name="role"
+                required
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-500/20"
+              >
+                <option value="">Sélectionner votre fonction</option>
+                <option value="Enseignant">Enseignant</option>
+                <option value="Responsable">Responsable</option>
+                <option value="Autres">Autres</option>
+              </select>
+            </div>
           </div>
           <div>
             <label
@@ -96,15 +164,10 @@ export function ContactSection() {
               className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-500/20"
             >
               <option value="">Sélectionner le sujet</option>
-              <option value="Demande de démo établissement">
-                Demande de démo établissement
-              </option>
-              <option value="Question sur les tarifs">
-                Question sur les tarifs
-              </option>
-              <option value="Support technique">Support technique</option>
-              <option value="Partenariat">Partenariat</option>
-              <option value="Autre">Autre</option>
+              <option value="Démo Produit">Démo Produit</option>
+              <option value="Discussion Tarifaire">Discussion Tarifaire</option>
+              <option value="Audit de Processus">Audit de Processus</option>
+              <option value="Autres">Autres</option>
             </select>
           </div>
           <div>
@@ -135,23 +198,21 @@ export function ContactSection() {
               <Send className="h-4 w-4 shrink-0" />
             )}
             {pending
-              ? "Ouverture du courrier…"
+              ? "Envoi en cours…"
               : sent
-                ? "Redirection vers votre client mail…"
+                ? "Message envoyé"
                 : "Envoyer"}
           </button>
+          {sent ? (
+            <p className="text-sm text-success-700">
+              Merci ! Votre message a bien été envoyé.
+            </p>
+          ) : null}
+          {error ? (
+            <p className="text-sm text-red-700">{error}</p>
+          ) : null}
         </form>
 
-        <p className="mt-4 text-center text-xs text-gray-500">
-          Une fenêtre d’envoi d’email s’ouvrira. Sinon, écrivez à{" "}
-          <a
-            href="mailto:contact@correxia.fr"
-            className="font-medium text-primary-600 hover:underline"
-          >
-            contact@correxia.fr
-          </a>
-          .
-        </p>
       </div>
     </section>
   );

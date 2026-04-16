@@ -16,15 +16,15 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "fr",
     icons: [
       {
-        src: "/logo-correxia.svg",
-        sizes: "any",
-        type: "image/svg+xml",
+        src: "/logo-correxia-mark.png",
+        sizes: "512x512",
+        type: "image/png",
         purpose: "any",
       },
       {
-        src: "/logo-correxia.svg",
-        sizes: "any",
-        type: "image/svg+xml",
+        src: "/logo-correxia-mark.png",
+        sizes: "512x512",
+        type: "image/png",
         purpose: "maskable",
       },
     ],

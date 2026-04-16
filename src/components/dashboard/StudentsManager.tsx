@@ -38,6 +38,8 @@ type Props = {
   emptyStateFooter?: ReactNode;
 };
 
+const IMPORT_CHUNK_SIZE = 100;
+
 function formatShortDate(iso: string | null | undefined) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("fr-FR", {
@@ -280,6 +282,9 @@ export function StudentsManager({
     let ok = 0;
     const rowErrors: string[] = [...parsed.errors];
     try {
+      const payload: Array<Record<string, unknown>> = [];
+      const payloadLineNumbers: number[] = [];
+
       for (let i = 0; i < parsed.rows.length; i++) {
         const r = parsed.rows[i];
         const classId = classByName.get((r.class_name ?? "").trim().toLowerCase());
@@ -296,10 +301,23 @@ export function StudentsManager({
           class_id: classId,
         };
         if (r.id_interne) insert.id_interne = r.id_interne;
-        const { error } = await supabase.from("students").insert(insert);
-        if (error) rowErrors.push(`Ligne import ${i + 2} : ${error.message}`);
-        else ok++;
+        payload.push(insert);
+        payloadLineNumbers.push(i + 2);
       }
+
+      for (let i = 0; i < payload.length; i += IMPORT_CHUNK_SIZE) {
+        const chunk = payload.slice(i, i + IMPORT_CHUNK_SIZE);
+        const chunkLineNumbers = payloadLineNumbers.slice(i, i + IMPORT_CHUNK_SIZE);
+        const { error } = await supabase.from("students").insert(chunk);
+        if (error) {
+          const firstLine = chunkLineNumbers[0];
+          const lastLine = chunkLineNumbers[chunkLineNumbers.length - 1];
+          rowErrors.push(`Lignes import ${firstLine}-${lastLine} : ${error.message}`);
+          continue;
+        }
+        ok += chunk.length;
+      }
+
       if (ok > 0) {
         const details = rowErrors.slice(0, 3).join(" | ");
         await Swal.fire({

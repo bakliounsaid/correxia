@@ -6,8 +6,8 @@ type Props = {
   /** Taille d’affichage (carré), en px */
   size?: number;
   /**
-   * `mark` = logo PNG officiel (recommandé header, hero).
-   * `svg` = pictogramme vectoriel léger.
+   * Conservé pour compatibilité des appels existants.
+   * Les deux variantes utilisent désormais le logo PNG officiel.
    */
   variant?: "mark" | "svg";
   priority?: boolean;
@@ -16,25 +16,13 @@ type Props = {
 export function CorrexiaLogo({
   className,
   size = 40,
-  variant = "mark",
   priority = false,
 }: Props) {
-  if (variant === "svg") {
-    return (
-      <Image
-        src="/logo-correxia.svg"
-        alt="CORREXIA"
-        width={size}
-        height={size}
-        className={cn("shrink-0 object-contain", className)}
-        priority={priority}
-      />
-    );
-  }
+  const src = "/logo-correxia-mark.png";
 
   return (
     <Image
-      src="/logo-correxia-mark.png"
+      src={src}
       alt="CORREXIA"
       width={512}
       height={512}

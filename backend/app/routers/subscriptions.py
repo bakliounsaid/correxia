@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import stripe
+from fastapi.concurrency import run_in_threadpool
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -78,7 +79,7 @@ async def create_checkout_session(
         params["customer_email"] = user.email
 
     try:
-        session = stripe.checkout.Session.create(**params)
+        session = await run_in_threadpool(stripe.checkout.Session.create, **params)
     except stripe.error.StripeError as e:
         raise HTTPException(502, detail=str(e.user_message or e)) from e
 
@@ -179,8 +180,8 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         raise HTTPException(400, detail="Signature manquante")
 
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig, settings.stripe_webhook_secret
+        event = await run_in_threadpool(
+            stripe.Webhook.construct_event, payload, sig, settings.stripe_webhook_secret
         )
     except ValueError as e:
         raise HTTPException(400, detail="Payload invalide") from e
@@ -198,7 +199,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         if not sub_id:
             return {"received": True}
         try:
-            stripe_sub = stripe.Subscription.retrieve(sub_id)
+            stripe_sub = await run_in_threadpool(stripe.Subscription.retrieve, sub_id)
         except stripe.error.StripeError:
             return {"received": True}
         price_cents = 0

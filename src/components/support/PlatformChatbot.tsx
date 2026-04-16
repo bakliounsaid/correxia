@@ -6,7 +6,6 @@ import { MessageCircle, Send, Sparkles, X } from "lucide-react";
 import {
   findPlatformAnswer,
   PLATFORM_CHATBOT_INTRO,
-  QUICK_PROMPTS,
 } from "@/lib/platform-chatbot-knowledge";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +23,7 @@ function uid() {
 
 export function PlatformChatbot() {
   const panelId = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -147,22 +146,6 @@ export function PlatformChatbot() {
                 <span className="h-1.5 w-1.5 rounded-full bg-primary-500" />
                 <span className="h-1.5 w-1.5 rounded-full bg-primary-500" />
                 <span className="h-1.5 w-1.5 rounded-full bg-primary-500" />
-              </div>
-            ) : null}
-
-            {!typing && messages.length === 1 ? (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {QUICK_PROMPTS.map((q) => (
-                  <button
-                    key={q.label}
-                    type="button"
-                    disabled={typing}
-                    onClick={() => sendText(q.send)}
-                    className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-left text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100 disabled:opacity-50"
-                  >
-                    {q.label}
-                  </button>
-                ))}
               </div>
             ) : null}
 

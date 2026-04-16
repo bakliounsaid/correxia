@@ -14,10 +14,10 @@ export const metadata: Metadata = {
     "Plateforme de correction automatisée des copies pour les matières scientifiques.",
   icons: {
     icon: [
-      { url: "/logo-correxia.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/logo-correxia-mark.png", type: "image/png", sizes: "512x512" },
     ],
-    shortcut: "/logo-correxia.svg",
-    apple: [{ url: "/logo-correxia.svg", type: "image/svg+xml" }],
+    shortcut: "/logo-correxia-mark.png",
+    apple: [{ url: "/logo-correxia-mark.png", type: "image/png", sizes: "512x512" }],
   },
   appleWebApp: {
     capable: true,

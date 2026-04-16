@@ -214,20 +214,28 @@ export function PricingSection() {
   const plans = segment === "b2c" ? b2cPlans : b2bPlans;
 
   return (
-    <section id="tarifs" className="border-t border-gray-100 bg-gray-50 py-16 md:py-20">
-      <div className="mx-auto max-w-6xl px-5">
-        <h2 className="text-3xl font-semibold text-gray-900">Tarifs</h2>
-        <p className="mt-2 max-w-2xl text-gray-600">
-          Choisissez l’offre adaptée à votre situation : enseignant indépendant
-          ou établissement scolaire.
-        </p>
+    <section id="tarifs" className="relative overflow-hidden border-t border-gray-100 bg-gradient-to-b from-gray-50 via-white to-gray-50 py-16 md:py-20">
+      <div
+        className="pointer-events-none absolute -left-20 top-8 h-56 w-56 rounded-full bg-primary-200/30 blur-3xl motion-reduce:animate-none animate-hero-glow"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -right-16 bottom-4 h-52 w-52 rounded-full bg-secondary-200/35 blur-3xl motion-reduce:animate-none animate-hero-glow"
+        style={{ animationDelay: "2.5s" }}
+        aria-hidden
+      />
+
+      <div className="relative mx-auto max-w-6xl px-5">
+        <h2 className="text-center text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">
+          Tarifs
+        </h2>
 
         <div
           className="mt-8 flex justify-center"
           role="tablist"
           aria-label="Type d’offre"
         >
-          <div className="inline-flex rounded-full border border-gray-200 bg-white p-1 shadow-sm">
+          <div className="inline-flex rounded-full border border-gray-200 bg-white/90 p-1 shadow-sm backdrop-blur">
             <button
               type="button"
               role="tab"
@@ -256,12 +264,6 @@ export function PricingSection() {
             </button>
           </div>
         </div>
-
-        <p className="mt-6 text-center text-xs font-medium uppercase tracking-wide text-gray-500">
-          {segment === "b2c"
-            ? "B2C — enseignants indépendants"
-            : "B2B — écoles et réseaux"}
-        </p>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-3">
           {plans.map((plan) => (

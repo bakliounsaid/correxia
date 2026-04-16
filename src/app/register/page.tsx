@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Check } from "lucide-react";
 import { CorrexiaLogo } from "@/components/brand/CorrexiaLogo";
 import { RegisterSwitcherPanel } from "@/components/auth/RegisterSwitcherPanel";
@@ -14,9 +15,9 @@ export default function RegisterPage() {
     <div className="flex min-h-screen flex-col lg:flex-row">
       <div className="relative flex flex-1 flex-col justify-between bg-gradient-to-b from-[#5B21B6] to-[#7C3AED] px-8 py-10 text-white lg:max-w-[42%] lg:px-10">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
-              <CorrexiaLogo size={28} />
+          <Link href="/" className="inline-flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white">
+              <CorrexiaLogo variant="mark" size={28} priority />
             </div>
             <div>
               <p className="text-lg font-bold tracking-wide">CORREXIA</p>
@@ -24,7 +25,7 @@ export default function RegisterPage() {
                 Correction assistée par IA
               </p>
             </div>
-          </div>
+          </Link>
           <h1 className="mt-12 max-w-sm text-3xl font-semibold leading-tight">
             Créer un compte
           </h1>
