@@ -93,26 +93,6 @@ const testimonials = [
   },
 ] as const;
 
-const landingPosts = [
-  {
-    tag: "Pédagogie",
-    title: "Barème et IA : garder le contrôle pédagogique",
-    excerpt:
-      "Comment structurer un barème clair pour que la correction assistée reste alignée avec vos objectifs.",
-  },
-  {
-    tag: "IA",
-    title: "Correction scientifique et vision par ordinateur",
-    excerpt:
-      "Ce que l'IA voit dans une copie manuscrite de maths ou de physique - et ses limites.",
-  },
-  {
-    tag: "Organisation",
-    title: "Flux de travail : de la collecte des copies à la note finale",
-    excerpt: "Un parcours type pour les classes de lycée avec CORREXIA.",
-  },
-] as const;
-
 export const metadata: Metadata = {
   title: "CORREX IA",
   description:

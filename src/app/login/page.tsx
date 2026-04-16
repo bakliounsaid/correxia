@@ -2,11 +2,7 @@ import Link from "next/link";
 import { CorrexiaLogo } from "@/components/brand/CorrexiaLogo";
 import { LoginForm } from "@/components/auth/LoginForm";
 
-type Props = {
-  searchParams: { redirect?: string; error?: string };
-};
-
-export default function LoginPage({ searchParams: _searchParams }: Props) {
+export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <div className="relative flex flex-1 flex-col justify-between bg-gradient-to-br from-[#6D28D9] via-[#7C3AED] to-[#A78BFA] px-8 py-10 text-white lg:max-w-[46%] lg:px-12">
