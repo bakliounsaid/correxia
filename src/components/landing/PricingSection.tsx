@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Swal from "sweetalert2";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 type Feature = { label: string; included: boolean };
@@ -17,6 +18,12 @@ type Plan = {
   ctaStyle?: "primary" | "secondary" | "outline";
   features: Feature[];
   footnote?: string;
+  stripe?: {
+    endpoint: "/api/billing/teacher-checkout" | "/api/billing/school-checkout";
+    payload: Record<string, unknown>;
+    /** redirection si utilisateur non autorisé */
+    fallbackHref: string;
+  };
 };
 
 const b2cPlans: Plan[] = [
@@ -46,6 +53,11 @@ const b2cPlans: Plan[] = [
     highlight: true,
     cta: "Choisir Avancé",
     href: "/register",
+    stripe: {
+      endpoint: "/api/billing/teacher-checkout",
+      payload: { plan: "advanced" },
+      fallbackHref: "/register",
+    },
     ctaStyle: "primary",
     features: [
       { label: "Jusqu’à 250 copies par trimestre", included: true },
@@ -66,6 +78,11 @@ const b2cPlans: Plan[] = [
     priceNote: "par trimestre (3 mois)",
     cta: "Choisir Maîtrise",
     href: "/register",
+    stripe: {
+      endpoint: "/api/billing/teacher-checkout",
+      payload: { plan: "mastery" },
+      fallbackHref: "/register",
+    },
     ctaStyle: "secondary",
     features: [
       { label: "Copies illimitées par trimestre", included: true },
@@ -110,6 +127,11 @@ const b2bPlans: Plan[] = [
     highlight: true,
     cta: "Souscrire pour mon établissement",
     href: "/register-school",
+    stripe: {
+      endpoint: "/api/billing/school-checkout",
+      payload: { plan: "establishment" },
+      fallbackHref: "/register-school",
+    },
     ctaStyle: "primary",
     features: [
       { label: "Jusqu’à 10 enseignants", included: true },
@@ -160,6 +182,8 @@ function FeatureRow({ label, included }: Feature) {
 }
 
 function PlanCard({ plan }: { plan: Plan }) {
+  const [loading, setLoading] = useState(false);
+
   const ctaClasses =
     plan.ctaStyle === "primary"
       ? "bg-primary-500 text-white hover:bg-primary-600"
@@ -199,12 +223,52 @@ function PlanCard({ plan }: { plan: Plan }) {
           {plan.footnote}
         </p>
       )}
-      <Link
-        href={plan.href}
-        className={`mt-6 flex w-full justify-center rounded-full py-3 text-sm font-semibold transition-all duration-300 active:scale-[0.98] ${ctaClasses}`}
-      >
-        {plan.cta}
-      </Link>
+      {plan.stripe ? (
+        <button
+          type="button"
+          disabled={loading}
+          onClick={async () => {
+            setLoading(true);
+            try {
+              const stripe = plan.stripe;
+              if (!stripe) return;
+              const res = await fetch(stripe.endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(stripe.payload),
+              });
+              const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+
+              if (!res.ok || !data.url) {
+                if (res.status === 401 || res.status === 403) {
+                  window.location.href = stripe.fallbackHref;
+                  return;
+                }
+                await Swal.fire({
+                  icon: "error",
+                  title: "Paiement indisponible",
+                  text: data.error ?? "Impossible de lancer le paiement.",
+                });
+                return;
+              }
+
+              window.location.href = data.url;
+            } finally {
+              setLoading(false);
+            }
+          }}
+          className={`mt-6 flex w-full justify-center rounded-full py-3 text-sm font-semibold transition-all duration-300 active:scale-[0.98] ${ctaClasses}`}
+        >
+          {loading ? "Redirection…" : plan.cta}
+        </button>
+      ) : (
+        <Link
+          href={plan.href}
+          className={`mt-6 flex w-full justify-center rounded-full py-3 text-sm font-semibold transition-all duration-300 active:scale-[0.98] ${ctaClasses}`}
+        >
+          {plan.cta}
+        </Link>
+      )}
     </div>
   );
 }

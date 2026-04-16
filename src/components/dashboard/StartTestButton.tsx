@@ -3,7 +3,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
-import { Download, Play, Upload } from "lucide-react";
+import { Download, Play, RotateCcw, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
@@ -93,6 +93,7 @@ function StartTestButtonInner({
   const [submitting, setSubmitting] = useState(false);
   const [uploadingCorrection, setUploadingCorrection] = useState(false);
   const [uploadingAnswerSheets, setUploadingAnswerSheets] = useState(false);
+  const [resettingSheets, setResettingSheets] = useState(false);
   const [correcting, setCorrecting] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [students, setStudents] = useState<StudentOption[]>([]);
@@ -567,6 +568,52 @@ function StartTestButtonInner({
     }
   }
 
+  async function onResetImportedSheets() {
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Réinitialiser les feuilles importées ?",
+      text: "Cela supprime les scans déposés et les corrections IA de ce test, pour permettre un nouvel import propre.",
+      showCancelButton: true,
+      confirmButtonText: "Oui, réinitialiser",
+      cancelButtonText: "Annuler",
+      confirmButtonColor: "#d33",
+    });
+    if (!confirm.isConfirmed) return;
+
+    setResettingSheets(true);
+    try {
+      const res = await fetch(`/api/dashboard/evaluations/${evaluationId}/reset-imports`, {
+        method: "POST",
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        reset_imported_sheets?: number;
+      };
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error ?? "Réinitialisation impossible.");
+      }
+
+      await Swal.fire({
+        icon: "success",
+        title: "Réinitialisation terminée",
+        text: `${data.reset_imported_sheets ?? 0} feuille(s) importée(s) supprimée(s). Vous pouvez réimporter de nouvelles feuilles.`,
+      });
+      router.refresh();
+    } catch (err: unknown) {
+      await Swal.fire({
+        icon: "error",
+        title: "Erreur",
+        text:
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : "Réinitialisation impossible.",
+      });
+    } finally {
+      setResettingSheets(false);
+    }
+  }
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -613,6 +660,21 @@ function StartTestButtonInner({
           >
             <Upload className="h-4 w-4" />
             Déposer feuilles d&apos;examen
+          </Button>
+        ) : null}
+        {copyCount > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="border-red-200 text-red-700 hover:bg-red-50"
+            onClick={() => void onResetImportedSheets()}
+            disabled={resettingSheets}
+            loading={resettingSheets}
+            loadingText="Réinitialisation..."
+            title="Supprimer les feuilles importées et les corrections IA liées pour réimporter proprement"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Réinitialiser feuilles importées
           </Button>
         ) : null}
         <input

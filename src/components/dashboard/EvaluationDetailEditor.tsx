@@ -305,11 +305,6 @@ export function EvaluationDetailEditor({ evaluation }: Props) {
         </div>
         {sheetExpanded ? (
           <>
-            {!canEdit ? (
-              <p className="mt-2 text-sm text-gray-500">
-                Modification verrouillée : seul le statut <strong>created</strong> est modifiable.
-              </p>
-            ) : null}
             <form
               id="feuille-test-panel"
               className="mt-3 space-y-3"

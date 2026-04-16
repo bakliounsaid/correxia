@@ -77,12 +77,28 @@ export async function GET(
     aiConfidence: corr?.ai_confidence_score ?? null,
     aiFeedback: String(corr?.ai_analysis_json?.feedback ?? ""),
     aiPerExercise: Array.isArray(corr?.ai_analysis_json?.per_exercise)
-      ? (corr?.ai_analysis_json?.per_exercise ?? []).map((x, i) => ({
-          label: String(x?.label ?? `Exercice ${i + 1}`),
-          score: Number(x?.score ?? 0),
-          max: Number(x?.max ?? 0),
-          comment: x?.comment ? String(x.comment) : "",
-        }))
+      ? (corr?.ai_analysis_json?.per_exercise ?? []).map((x, i) => {
+          const rawScore =
+            x?.score ??
+            (x as { points?: unknown } | null)?.points ??
+            (x as { value?: unknown } | null)?.value ??
+            0;
+          const rawMax =
+            x?.max ??
+            (x as { max_points?: unknown } | null)?.max_points ??
+            (x as { total?: unknown } | null)?.total ??
+            20;
+
+          const scoreNum = Number(rawScore);
+          const maxNum = Number(rawMax);
+
+          return {
+            label: String(x?.label ?? `Exercice ${i + 1}`),
+            score: Number.isFinite(scoreNum) ? scoreNum : 0,
+            max: Number.isFinite(maxNum) && maxNum > 0 ? maxNum : 20,
+            comment: x?.comment ? String(x.comment) : "",
+          };
+        })
       : [],
     validatedScore: corr?.teacher_validated_points ?? null,
     passagesAVerifier: parsePassagesAVerifier(corr?.ai_analysis_json?.passages_a_verifier),

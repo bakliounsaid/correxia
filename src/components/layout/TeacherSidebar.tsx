@@ -73,7 +73,9 @@ export function TeacherSidebar({
   return (
     <aside className="flex w-full shrink-0 flex-col border-b border-gray-200 bg-white supports-[padding:max(0px)]:pt-[env(safe-area-inset-top)] md:sticky md:top-0 md:min-h-[100dvh] md:w-[260px] md:border-b-0 md:border-r md:supports-[padding:max(0px)]:pt-0">
       <div className="hidden items-start gap-3 px-5 py-6 md:flex">
-        <CorrexiaLogo variant="svg" size={36} />
+        <Link href="/" aria-label="Aller sur la landing">
+          <CorrexiaLogo variant="svg" size={36} />
+        </Link>
         <div>
           <p className="text-[15px] font-semibold tracking-tight text-gray-900">
             CORREXIA

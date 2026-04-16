@@ -86,6 +86,13 @@ function dedupePassages<T extends { zone: string; detail: string }>(items: T[]):
   return result;
 }
 
+function uncertaintyPenaltyFromPassages(count: number): number {
+  if (count <= 0) return 0;
+  // Pénalité progressive plafonnée: quelques zones douteuses sont tolérées,
+  // une copie largement ambiguë doit faire baisser clairement la confiance.
+  return Math.min(0.25, 0.03 + count * 0.035);
+}
+
 type PerExerciseRow = { label: string; score: number; max: number; comment: string };
 
 /**
@@ -142,6 +149,41 @@ function reconcileScoreWithCommentCritique(items: PerExerciseRow[]): {
     const c = (e.comment || "").trim();
     if (!c || !commentSuggestsPenaltyAtFullScore(c)) return e;
     const cap = roundQuarter(e.max * 0.7);
+    const newScore = clamp(Math.min(e.score, cap), 0, e.max);
+    if (Math.abs(newScore - e.score) > 1e-6) adjusted = true;
+    return { ...e, score: newScore };
+  });
+  return { rows, adjusted };
+}
+
+/**
+ * Garde-fou ciblé: inversion du sens d'inégalité (<, >, <=, >=) ou confusion
+ * "inférieur/supérieur" = erreur conceptuelle forte en maths/physique.
+ * Si le commentaire signale explicitement cette inversion, on plafonne la note
+ * de l'exercice à ~35% du max (erreur conceptuelle forte).
+ */
+function reconcileScoreWithInequalityDirectionConflict(items: PerExerciseRow[]): {
+  rows: PerExerciseRow[];
+  adjusted: boolean;
+} {
+  const conflictRegex = new RegExp(
+    [
+      "(<\\s*(au\\s+lieu\\s+de|au\\s+lieu\\s+d['’])\\s*>|>\\s*(au\\s+lieu\\s+de|au\\s+lieu\\s+d['’])\\s*<)",
+      "(<=\\s*(au\\s+lieu\\s+de|au\\s+lieu\\s+d['’])\\s*>=|>=\\s*(au\\s+lieu\\s+de|au\\s+lieu\\s+d['’])\\s*<=)",
+      "(signe\\s+d['’]?in[ée]galit[ée].{0,40}(faux|invers|incorrect|erron))",
+      "(sens\\s+de\\s+l['’]?in[ée]galit[ée].{0,40}(faux|invers|incorrect|erron))",
+      "(inf[ée]rieur.{0,40}(au\\s+lieu\\s+de|au\\s+lieu\\s+d['’]).{0,20}sup[ée]rieur)",
+      "(sup[ée]rieur.{0,40}(au\\s+lieu\\s+de|au\\s+lieu\\s+d['’]).{0,20}inf[ée]rieur)",
+    ].join("|"),
+    "i",
+  );
+
+  let adjusted = false;
+  const rows = items.map((e) => {
+    if (e.max <= 0) return e;
+    const c = (e.comment || "").trim();
+    if (!c || !conflictRegex.test(c)) return e;
+    const cap = roundQuarter(e.max * 0.35);
     const newScore = clamp(Math.min(e.score, cap), 0, e.max);
     if (Math.abs(newScore - e.score) > 1e-6) adjusted = true;
     return { ...e, score: newScore };
@@ -305,6 +347,9 @@ async function gradeWithAiText(
           "Tu corriges comme en contrôle classique: précis, motivé, sans généralités vagues.",
           "N'exige pas une copie conforme mot à mot à la correction type si la démarche et le résultat sont valides.",
           "En revanche, sois strict sur: erreurs de définition, erreurs de raisonnement, résultats faux, unités incohérentes, réponses hors sujet.",
+          "Point CRITIQUE: en inégalités, le sens du signe est obligatoire. Si la correction attend '>' et que l'élève met '<' (ou l'inverse), c'est une erreur majeure.",
+          "Même règle pour <= / >= et pour les formulations 'supérieur / inférieur': une inversion de sens doit entraîner une perte nette de points.",
+          "Ne valide jamais comme 'juste' une conclusion dont le sens d'inégalité est inversé, même si le calcul intermédiaire est correct.",
           "Accorde des demi-points ou quarts de barème quand c'est pertinent; cite l'exigence du barème dans le commentaire d'exercice.",
           `Barème total de l'évaluation: ${totalPoints} points (la somme des \"max\" dans per_exercise doit rejoindre ce total).`,
           `Matière: ${subject || "math"}.`,
@@ -340,6 +385,7 @@ async function gradeWithAiText(
           "- score (total) = somme des score de per_exercise (après respect des max); doit aussi être ≤ au barème total de l’évaluation.",
           "- comment: 1-3 phrases, ce qui est juste / faux / manquant, en référence au contenu élève (pas générique).",
           "- COHÉRENCE NOTE / COMMENTAIRE (obligatoire): si le commentaire d’un exercice signale une erreur, une conclusion fausse, une interprétation incorrecte ou une méthode invalide, la note de CET exercice NE PEUT PAS être le maximum. Réserve au moins 25–50 % des points selon la gravité.",
+          "- Inégalités: si l'élève inverse le sens (< vs >, <= vs >=, supérieur vs inférieur), c'est une erreur conceptuelle importante: pas de note maximale et pénalité significative.",
           "- Exemple INTERDIT: « interprétation de l’angle erronée » ou « conclusion fausse » avec 6/6. Dans ce cas la note doit baisser (ex. 3–5/6 selon le barème partiel).",
           "- confidence 0-1: ta certitude sur la justesse de la correction compte tenu de l'OCR.",
           "- notation_incertaine: [] si tout est clair. Sinon une entrée par zone où l’enseignant doit relire la copie (ex. zone=\"Exercice 3\", detail=\"la note dépend d’un symbole ambigu dans la transcription\"). Ne duplique pas inutilement l’OCR si déjà couvert.",
@@ -409,7 +455,9 @@ async function gradeWithAiText(
       }));
     const { rows: reconciled, adjusted: scoreCommentMismatchFixed } =
       reconcileScoreWithCommentCritique(perExercise);
-    perExercise = reconciled;
+    const { rows: reconciledIneq, adjusted: inequalityMismatchFixed } =
+      reconcileScoreWithInequalityDirectionConflict(reconciled);
+    perExercise = reconciledIneq;
     const perSum = perExercise.reduce((s, e) => s + e.score, 0);
     const modelTotal = clamp(Number(parsed.score ?? 0), 0, totalPoints);
     const rawScore =
@@ -423,14 +471,20 @@ async function gradeWithAiText(
     const lowContent = !hasContent || !hasContentModel || contentDensityModel < 0.1;
     const guardedScore = lowContent ? 0 : rawScore;
     const rawConfidence = clamp(
-      Number(parsed.confidence ?? 0.5) - coherencePenalty - (scoreCommentMismatchFixed ? 0.05 : 0),
+      Number(parsed.confidence ?? 0.5) -
+        coherencePenalty -
+        (scoreCommentMismatchFixed ? 0.05 : 0) -
+        (inequalityMismatchFixed ? 0.15 : 0),
       0,
       1,
     );
+    const uncertaintyCount = dedupePassages([...ocrUnreadableParts, ...notationIncertaine]).length;
+    const uncertaintyPenalty = uncertaintyPenaltyFromPassages(uncertaintyCount);
     const legibilityCap = Math.max(0.15, legibility);
-    const guardedConfidence = lowContent
+    const guardedConfidencePreClamp = lowContent
       ? Math.min(rawConfidence, 0.35, legibilityCap)
       : Math.min(rawConfidence, legibilityCap + 0.2);
+    const guardedConfidence = clamp(guardedConfidencePreClamp - uncertaintyPenalty, 0, 1);
     const guardedFeedback = lowContent
       ? "Copie détectée comme vide ou quasi vide : note fixée à 0/20. Vérification enseignant recommandée."
       : String(parsed.feedback ?? "Correction IA générée.");

@@ -50,7 +50,9 @@ export function AdminSidebar({ displayName, subtitle, initials }: Props) {
   return (
     <aside className="flex w-full shrink-0 flex-col border-b border-gray-200 bg-white md:min-h-[100dvh] md:w-[260px] md:border-b-0 md:border-r">
       <div className="hidden items-start gap-3 px-5 py-6 md:flex">
-        <CorrexiaLogo size={36} />
+        <Link href="/" aria-label="Aller sur la landing">
+          <CorrexiaLogo size={36} />
+        </Link>
         <div>
           <p className="text-[15px] font-semibold tracking-tight text-gray-900">
             CORREXIA

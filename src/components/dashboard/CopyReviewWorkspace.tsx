@@ -33,7 +33,22 @@ type Props = {
 function formatConfidence(v: number | null) {
   if (v == null || Number.isNaN(v)) return "—";
   const p = v <= 1 ? v * 100 : v;
-  return `${Math.round(p)}%`;
+  const normalized = clampLocal(p, 0, 100);
+  return `${normalized.toFixed(1)}%`;
+}
+
+function confidenceLabel(v: number | null): string {
+  if (v == null || Number.isNaN(v)) return "Non évaluée";
+  const p = v <= 1 ? v * 100 : v;
+  if (p >= 85) return "Très élevée";
+  if (p >= 70) return "Élevée";
+  if (p >= 50) return "Moyenne";
+  return "Faible";
+}
+
+function formatScoreOnCopy(v: number): string {
+  if (!Number.isFinite(v)) return "—/20";
+  return `${Number(v.toFixed(2))}/20`;
 }
 
 function clampLocal(value: number, min: number, max: number) {
@@ -61,17 +76,21 @@ function statusLabelFr(status: string) {
   return status || "—";
 }
 
+function clampZoom(v: number) {
+  return clampLocal(v, 0.5, 3);
+}
+
 function CopyReviewWorkspaceInner(props: Props) {
   const isModal = props.variant === "modal";
+  const [zoom, setZoom] = useState(1);
   const [perExercise, setPerExercise] = useState(() => buildClampedPerExercise(props.aiPerExercise));
+  const [showPerExerciseDetails, setShowPerExerciseDetails] = useState<boolean>(true);
   const [score, setScore] = useState<number>(() => {
     if (props.validatedScore != null) return props.validatedScore;
     const clamped = buildClampedPerExercise(props.aiPerExercise);
     if (clamped.length > 0) return clamped.reduce((s, x) => s + x.score, 0);
     return props.aiScore ?? 0;
   });
-  const [feedback, setFeedback] = useState("");
-  const [comments, setComments] = useState("");
   const [saving, setSaving] = useState(false);
 
   const changed = useMemo(() => {
@@ -89,8 +108,8 @@ function CopyReviewWorkspaceInner(props: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             teacher_validated_points: score,
-            teacher_feedback: feedback,
-            teacher_comments: comments,
+            teacher_feedback: "",
+            teacher_comments: "",
             acceptAi: !changed,
             perExerciseTeacher: perExercise,
           }),
@@ -128,6 +147,42 @@ function CopyReviewWorkspaceInner(props: Props) {
   }
 
   const validateLabel = changed ? "Enregistrer la révision" : "Valider la note";
+  const scoreOnCopy = formatScoreOnCopy(score);
+  const scoreOverlay = (
+    <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-md border-2 border-red-600 bg-white/85 px-3 py-1.5 shadow-md backdrop-blur-[1px]">
+      <p className="-rotate-3 text-xl font-extrabold italic tracking-wide text-red-700 sm:text-2xl">
+        {scoreOnCopy}
+      </p>
+    </div>
+  );
+
+  const noteBlock = (
+    <div className="mt-4 space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+      <label className="block text-sm font-semibold text-gray-900">Note finale enseignant (/20)</label>
+      <input
+        type="number"
+        min={0}
+        max={20}
+        step={0.25}
+        value={score}
+        onChange={(e) => setScore(Number(e.target.value || 0))}
+        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+      />
+      {!isModal ? (
+        <Button
+          type="button"
+          variant="success"
+          className="rounded-full px-4 py-2"
+          loading={saving}
+          loadingText="Enregistrement de la révision…"
+          onClick={() => void onValidate()}
+        >
+          <Send className="h-4 w-4" />
+          {validateLabel}
+        </Button>
+      ) : null}
+    </div>
+  );
 
   const mainRow = (
     <>
@@ -161,39 +216,80 @@ function CopyReviewWorkspaceInner(props: Props) {
           className={
             isModal
               ? "relative min-h-0 flex-1 bg-gray-100 p-2 sm:p-3"
-              : "flex min-h-0 flex-1 items-start justify-center overflow-auto bg-gray-100 p-4"
+              : "relative flex min-h-0 flex-1 items-start justify-center overflow-auto bg-gray-100 p-4"
           }
         >
+          {!props.previewUrl?.toLowerCase().endsWith(".pdf") ? (
+            <div className="absolute left-5 top-5 z-20 flex items-center gap-1 rounded-lg border border-gray-200 bg-white/95 p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setZoom((z) => clampZoom(z - 0.25))}
+                className="rounded px-2 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                aria-label="Dézoomer"
+              >
+                -
+              </button>
+              <span className="min-w-[56px] text-center text-xs font-medium text-gray-700">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoom((z) => clampZoom(z + 0.25))}
+                className="rounded px-2 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                aria-label="Zoomer"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom(1)}
+                className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Reset
+              </button>
+            </div>
+          ) : null}
           {props.previewUrl ? (
             props.previewUrl.toLowerCase().endsWith(".pdf") ? (
               isModal ? (
-                <iframe
-                  title="Aperçu de la copie (PDF)"
-                  src={props.previewUrl}
-                  className="absolute inset-2 h-[calc(100%-1rem)] w-[calc(100%-1rem)] rounded-lg border border-gray-200 bg-white sm:inset-3 sm:h-[calc(100%-1.5rem)] sm:w-[calc(100%-1.5rem)]"
-                />
+                <div className="absolute inset-2 sm:inset-3">
+                  <iframe
+                    title="Aperçu de la copie (PDF)"
+                    src={props.previewUrl}
+                    className="h-full w-full rounded-lg border border-gray-200 bg-white"
+                  />
+                  {scoreOverlay}
+                </div>
               ) : (
-                <iframe
-                  title="Aperçu de la copie (PDF)"
-                  src={props.previewUrl}
-                  className="h-[80vh] w-full rounded-lg border border-gray-200 bg-white"
-                />
+                <div className="relative h-[80vh] w-full">
+                  <iframe
+                    title="Aperçu de la copie (PDF)"
+                    src={props.previewUrl}
+                    className="h-full w-full rounded-lg border border-gray-200 bg-white"
+                  />
+                  {scoreOverlay}
+                </div>
               )
             ) : isModal ? (
               <div className="absolute inset-2 overflow-auto sm:inset-3">
                 <img
                   src={props.previewUrl}
                   alt="Copie élève"
-                  className="mx-auto block w-full max-w-[min(100%,1400px)] rounded-lg border border-gray-200 bg-white shadow-sm"
-                  style={{ height: "auto" }}
+                  className="mx-auto block max-h-[calc(100dvh-260px)] w-auto max-w-full rounded-lg border border-gray-200 bg-white shadow-sm"
+                  style={{ height: "auto", transform: `scale(${zoom})`, transformOrigin: "top center" }}
                 />
+                {scoreOverlay}
               </div>
             ) : (
-              <img
-                src={props.previewUrl}
-                alt="Copie élève"
-                className="max-h-[80vh] w-auto rounded-lg border border-gray-200 bg-white"
-              />
+              <div className="relative">
+                <img
+                  src={props.previewUrl}
+                  alt="Copie élève"
+                  className="max-h-[80vh] w-auto rounded-lg border border-gray-200 bg-white"
+                  style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+                />
+                {scoreOverlay}
+              </div>
             )
           ) : (
             <div className="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-600">
@@ -207,12 +303,71 @@ function CopyReviewWorkspaceInner(props: Props) {
         className={`w-full shrink-0 bg-gray-50 p-4 sm:p-5 lg:w-[min(100%,380px)] lg:max-w-[420px] lg:flex-[1] ${isModal ? "max-h-[min(36dvh,320px)] min-h-0 overflow-y-auto border-t border-gray-200 lg:max-h-none lg:border-t-0" : ""}`}
       >
         <h2 className="text-lg font-semibold text-gray-900">Détails de correction</h2>
+        {isModal ? noteBlock : null}
         <div className="mt-3 space-y-2 rounded-xl border border-gray-200 bg-white p-4 text-sm">
           <p>
             <strong>Proposition IA :</strong> {props.aiScore != null ? `${props.aiScore}/20` : "—"}
           </p>
+          {props.aiPerExercise.length > 0 ? (
+            <div className="mt-2 space-y-1">
+              <button
+                type="button"
+                onClick={() => setShowPerExerciseDetails((v) => !v)}
+                className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm font-semibold text-gray-900 hover:bg-gray-50"
+              >
+                <span>Détail par exercice</span>
+                <span className="text-xs font-normal text-gray-500">{perExercise.length} éléments</span>
+              </button>
+
+              {showPerExerciseDetails ? (
+                <div className="space-y-1">
+                  {perExercise.map((ex, i) => (
+                    <div key={`${ex.label}-${i}`} className="rounded-lg border border-red-200 bg-red-50 p-2">
+                      <p className="text-red-700">{ex.label}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={ex.max || 20}
+                          step={0.25}
+                          value={ex.score}
+                          onChange={(e) => {
+                            const next = Number(e.target.value || 0);
+                            setPerExercise((prev) =>
+                              prev.map((p, idx) =>
+                                idx === i ? { ...p, score: clampLocal(next, 0, p.max || 20) } : p,
+                              ),
+                            );
+                          }}
+                          className="w-24 rounded border border-red-300 bg-white px-2 py-1 text-sm text-red-700"
+                        />
+                        <span className="text-red-700">/ {ex.max}</span>
+                      </div>
+                      {ex.comment ? <p className="mt-1 text-xs text-red-600">{ex.comment}</p> : null}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setScore(
+                        Number(
+                          perExercise.reduce((s, ex) => s + Number(ex.score || 0), 0).toFixed(2),
+                        ),
+                      )
+                    }
+                    className="mt-2 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    Recalculer la note finale depuis les exercices
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <p>
             <strong>Précision IA :</strong> {formatConfidence(props.aiConfidence)}
+          </p>
+          <p className="text-xs text-gray-600">
+            Niveau de confiance : <strong>{confidenceLabel(props.aiConfidence)}</strong>
           </p>
           <p className="text-xs text-gray-500">
             Basée sur la lisibilité et la clarté de la copie (si écriture floue/ambiguë, la précision baisse).
@@ -242,92 +397,10 @@ function CopyReviewWorkspaceInner(props: Props) {
             </div>
           ) : null}
           <p>
-            <strong>Analyse IA :</strong> {props.aiFeedback || "—"}
+            <strong>Remarque finale IA :</strong> {props.aiFeedback || "—"}
           </p>
-          {props.aiPerExercise.length > 0 ? (
-            <div className="mt-2 space-y-1">
-              <p className="font-semibold text-gray-900">Détail par exercice</p>
-              {perExercise.map((ex, i) => (
-                <div key={`${ex.label}-${i}`} className="rounded-lg border border-red-200 bg-red-50 p-2">
-                  <p className="text-red-700">{ex.label}</p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      max={ex.max || 20}
-                      step={0.25}
-                      value={ex.score}
-                      onChange={(e) => {
-                        const next = Number(e.target.value || 0);
-                        setPerExercise((prev) =>
-                          prev.map((p, idx) =>
-                            idx === i ? { ...p, score: clampLocal(next, 0, p.max || 20) } : p,
-                          ),
-                        );
-                      }}
-                      className="w-24 rounded border border-red-300 bg-white px-2 py-1 text-sm text-red-700"
-                    />
-                    <span className="text-red-700">/ {ex.max}</span>
-                  </div>
-                  {ex.comment ? <p className="mt-1 text-xs text-red-600">{ex.comment}</p> : null}
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() =>
-                  setScore(
-                    Number(
-                      perExercise.reduce((s, ex) => s + Number(ex.score || 0), 0).toFixed(2),
-                    ),
-                  )
-                }
-                className="mt-2 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
-              >
-                Recalculer la note finale depuis les exercices
-              </button>
-            </div>
-          ) : null}
         </div>
-
-        <div className="mt-4 space-y-3 rounded-xl border border-gray-200 bg-white p-4">
-          <label className="block text-sm font-semibold text-gray-900">Note finale enseignant (/20)</label>
-          <input
-            type="number"
-            min={0}
-            max={20}
-            step={0.25}
-            value={score}
-            onChange={(e) => setScore(Number(e.target.value || 0))}
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
-          />
-          <textarea
-            rows={3}
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Feedback élève"
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
-          />
-          <textarea
-            rows={3}
-            value={comments}
-            onChange={(e) => setComments(e.target.value)}
-            placeholder="Commentaire interne enseignant"
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
-          />
-          {!isModal ? (
-            <Button
-              type="button"
-              variant="success"
-              className="rounded-full px-4 py-2"
-              loading={saving}
-              loadingText="Enregistrement de la révision…"
-              onClick={() => void onValidate()}
-            >
-              <Send className="h-4 w-4" />
-              {validateLabel}
-            </Button>
-          ) : null}
-        </div>
+        {!isModal ? noteBlock : null}
       </aside>
     </>
   );
