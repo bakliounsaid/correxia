@@ -1,30 +1,30 @@
 # CORREXIA
 
-Plateforme de correction de copies assistée par IA, conçue pour les enseignants de sciences et les établissements scolaires.
+AI-assisted exam correction platform designed for science teachers and schools.
 
-## Ce que fait le projet
+## What the project does
 
-CORREXIA permet de:
+CORREXIA allows you to:
 
-- créer des évaluations avec un barème défini par l'enseignant;
-- importer des copies manuscrites (scan/photo);
-- proposer une correction assistée par IA;
-- laisser la validation finale à l'enseignant;
-- suivre les résultats via des tableaux de bord;
-- gérer les abonnements (enseignant et établissement).
+- create assessments with a grading scheme defined by the teacher;
+- import handwritten exam papers (scan/photo);
+- get an AI-assisted correction suggestion;
+- leave the final validation to the teacher;
+- track results through dashboards;
+- manage subscriptions (teacher and school plans).
 
-Le positionnement produit est clair: **l'IA assiste**, l'enseignant garde la décision pédagogique.
+The product positioning is clear: **AI assists**, the teacher keeps the final pedagogical decision.
 
 ## Architecture
 
-Le dépôt contient 2 parties:
+The repository contains 2 parts:
 
-- `./` (racine): frontend **Next.js** (App Router, TypeScript, Tailwind, Supabase, Stripe côté web);
-- `./backend`: API **FastAPI** (auth, tests, étudiants, abonnements, santé).
+- `./` (root): **Next.js** frontend (App Router, TypeScript, Tailwind, Supabase, Stripe on the web side);
+- `./backend`: **FastAPI** API (auth, tests, students, subscriptions, health).
 
 ### Frontend
 
-Technos principales:
+Main technologies:
 
 - Next.js 14
 - React 18
@@ -34,27 +34,27 @@ Technos principales:
 
 ### Backend
 
-Technos principales:
+Main technologies:
 
 - FastAPI
 - Uvicorn
 - SQLAlchemy (async)
 - Stripe SDK
 
-API exposée sous le préfixe ` /api/v1 `.
+API exposed under the `/api/v1` prefix.
 
-## Démarrage local
+## Local setup
 
-## 1) Frontend (racine du repo)
+### 1) Frontend (repo root)
 
 ```bash
 npm install
 npm run dev
 ```
 
-Application disponible sur `http://localhost:3000`.
+App available at `http://localhost:3000`.
 
-## 2) Backend (`backend/`)
+### 2) Backend (`backend/`)
 
 ```bash
 cd backend
@@ -62,32 +62,32 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-API disponible sur `http://localhost:8000` (et docs si mode debug actif).
+API available at `http://localhost:8000` (with docs if debug mode is active).
 
-## Variables d'environnement
+## Environment variables
 
-- Front: copier `.env.local.example` vers `.env.local` à la racine.
-- Back: copier `backend/.env.example` vers `backend/.env`.
+- Frontend: copy `.env.local.example` to `.env.local` at the repo root.
+- Backend: copy `backend/.env.example` to `backend/.env`.
 
-Ne jamais exposer de secrets backend dans des variables `NEXT_PUBLIC_*`.
+Never expose backend secrets through `NEXT_PUBLIC_*` variables.
 
-## Déploiement recommandé
+## Recommended deployment
 
-## Front sur Vercel
+### Frontend on Vercel
 
-- Repository: ce repo
-- Root Directory: `.` (racine)
+- Repository: this repo
+- Root Directory: `.` (root)
 - Build command: `npm run build`
 
-## Backend sur Render
+### Backend on Render
 
-- Repository: ce repo (ou repo dédié backend)
+- Repository: this repo (or a dedicated backend repo)
 - Root Directory: `backend`
 - Build command: `pip install -r requirements.txt`
 - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
-## Important en production
+## Important in production
 
-- Configurer `CORS_ORIGINS` côté backend avec le domaine Vercel.
-- Pointer le frontend vers l'URL publique Render (pas `localhost`).
-- Séparer strictement les secrets front/backend.
+- Configure `CORS_ORIGINS` on the backend with the Vercel domain.
+- Point the frontend to the public Render URL (not `localhost`).
+- Keep frontend/backend secrets strictly separated.
