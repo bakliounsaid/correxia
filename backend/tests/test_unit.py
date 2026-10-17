@@ -188,3 +188,24 @@ async def test_integrations_detail_is_private_outside_debug(client, monkeypatch)
     monkeypatch.setattr(get_settings(), "debug", False)
     res = await client.get("/api/v1/health/integrations")
     assert res.status_code == 401
+
+
+async def test_unreachable_supabase_is_logged_with_host(monkeypatch, caplog):
+    """Une SUPABASE_URL erronée doit laisser une trace exploitable dans les logs (hôte, sans clé)."""
+    import httpx
+
+    from app import supabase_auth
+    from app.config import get_settings
+
+    class Unreachable:
+        async def get(self, *_args, **_kwargs):
+            raise httpx.ConnectError("Name or service not known")
+
+    monkeypatch.setattr(get_settings(), "supabase_url", "https://ancien-projet.supabase.co")
+    monkeypatch.setattr(get_settings(), "supabase_anon_key", "sb_publishable_secret")
+    monkeypatch.setattr(supabase_auth, "http_client", Unreachable)
+    with pytest.raises(HTTPException) as exc:
+        await supabase_auth.verify_access_token("jeton-inconnu")
+    assert exc.value.status_code == 503
+    assert "ancien-projet.supabase.co" in caplog.text
+    assert "sb_publishable_secret" not in caplog.text
