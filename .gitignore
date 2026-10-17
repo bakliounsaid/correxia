@@ -33,8 +33,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
+# local env files (secrets — ne jamais versionner, seuls les *.example le sont)
+.env
 .env*.local
+backend/.env
+
+# python
+__pycache__/
+*.pyc
 
 # vercel
 .vercel

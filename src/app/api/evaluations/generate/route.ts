@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getTeacherId } from "@/lib/teacher-context";
 
 type GenerateBody = {
   title?: string;
@@ -80,6 +81,12 @@ function fallbackPayload(body: GenerateBody): GeneratedPayload {
 }
 
 export async function POST(req: Request) {
+  // Appel OpenAI facturé : réservé aux enseignants connectés.
+  const teacherId = await getTeacherId();
+  if (!teacherId) {
+    return NextResponse.json({ error: "Profil enseignant introuvable." }, { status: 403 });
+  }
+
   const body = (await req.json()) as GenerateBody;
   const title = (body.title ?? "").trim();
   const className = (body.className ?? "").trim();
