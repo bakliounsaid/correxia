@@ -10,6 +10,7 @@ import {
   offerLabelFromPlan,
   type SchoolOffer,
 } from "@/lib/school-billing-plans";
+import { useOffersModalFromUrl } from "@/hooks/useOffersModalFromUrl";
 import { backendFetch } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 
@@ -36,20 +37,10 @@ export function SchoolAbonnementClient({
   initialOffersOpen,
 }: Props) {
   const router = useRouter();
-  const [offersOpen, setOffersOpen] = useState(() => Boolean(initialOffersOpen));
+  const [offersOpen, setOffersOpen] = useOffersModalFromUrl(initialOffersOpen);
   const [paying, setPaying] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: "ok" | "err" | "info"; text: string } | null>(null);
   const verifiedRef = useRef(false);
-
-  useEffect(() => {
-    if (!initialOffersOpen || typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("upgrade") === "1") {
-      url.searchParams.delete("upgrade");
-      const qs = url.searchParams.toString();
-      window.history.replaceState(null, "", qs ? `${url.pathname}?${qs}` : url.pathname);
-    }
-  }, [initialOffersOpen]);
 
   const verifySession = useCallback(
     async (sid: string) => {
