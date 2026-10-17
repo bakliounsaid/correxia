@@ -64,6 +64,32 @@ class Settings(BaseSettings):
     mail_encryption: str | None = None  # ssl | tls
     smtp_reply_to: str = "contact@correxia.fr"
 
+    @field_validator(
+        "database_url",
+        "supabase_url",
+        "supabase_anon_key",
+        "supabase_service_role_key",
+        "openai_api_key",
+        "stripe_secret_key",
+        "stripe_webhook_secret",
+        "frontend_url",
+        mode="before",
+    )
+    @classmethod
+    def strip_pasted_value(cls, v):
+        """Valeurs collées dans l'hébergeur : espaces, retours à la ligne ou guillemets autour sont retirés."""
+        if isinstance(v, str):
+            v = v.strip().strip("\"'").strip()
+        return v
+
+    @field_validator("supabase_url", "frontend_url", mode="after")
+    @classmethod
+    def normalize_base_url(cls, v):
+        if not v:
+            return v
+        v = v.rstrip("/")
+        return v if v.startswith(("http://", "https://")) else f"https://{v}"
+
     @field_validator("debug", mode="before")
     @classmethod
     def parse_debug(cls, v):

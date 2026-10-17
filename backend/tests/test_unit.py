@@ -209,3 +209,20 @@ async def test_unreachable_supabase_is_logged_with_host(monkeypatch, caplog):
     assert exc.value.status_code == 503
     assert "ancien-projet.supabase.co" in caplog.text
     assert "sb_publishable_secret" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "https://mrflnacostqkqwmhinch.supabase.co",
+        ' "https://mrflnacostqkqwmhinch.supabase.co/" ',
+        "mrflnacostqkqwmhinch.supabase.co\n",
+    ],
+)
+def test_supabase_url_tolerates_pasted_values(raw):
+    assert Settings(supabase_url=raw).supabase_url == "https://mrflnacostqkqwmhinch.supabase.co"
+
+
+def test_secrets_are_stripped_of_quotes_and_spaces():
+    s = Settings(supabase_anon_key=' "sb_publishable_x" ', database_url="'postgresql://u:p@h:5432/db'\n")
+    assert (s.supabase_anon_key, s.database_url) == ("sb_publishable_x", "postgresql://u:p@h:5432/db")
