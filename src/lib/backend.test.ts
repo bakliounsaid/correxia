@@ -3,7 +3,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getSession = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/supabase", () => ({ getSupabaseBrowserClient: () => ({ auth: { getSession } }) }));
 
-import { backendFetch } from "@/lib/backend";
+import { apiBaseUrl, backendFetch } from "@/lib/backend";
+
+describe("apiBaseUrl", () => {
+  it.each([
+    ["https://correxia-2.onrender.com", "https://correxia-2.onrender.com/api/v1"],
+    ["https://correxia-2.onrender.com/", "https://correxia-2.onrender.com/api/v1"],
+    ["https://correxia-2.onrender.com/api/v1", "https://correxia-2.onrender.com/api/v1"],
+    ["https://correxia-2.onrender.com/api/v1/", "https://correxia-2.onrender.com/api/v1"],
+    [undefined, "http://localhost:8000/api/v1"],
+  ])("%s → %s", (configured, expected) => {
+    expect(apiBaseUrl(configured)).toBe(expected);
+  });
+});
 
 const fetchMock = vi.fn();
 

@@ -93,7 +93,16 @@ class Settings(BaseSettings):
         return None
 
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        """
+        Origines autorisées. Le navigateur envoie « https://site.app » (sans / final ni chemin) et la
+        comparaison est exacte : on tolère donc les saisies courantes « https://site.app/ » ou entre guillemets.
+        """
+        origins = []
+        for raw in self.cors_origins.split(","):
+            origin = raw.strip().strip("\"'").strip().rstrip("/")
+            if origin:
+                origins.append(origin)
+        return origins
 
 
 @lru_cache

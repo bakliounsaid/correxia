@@ -35,6 +35,12 @@ def test_cors_origin_list_ignores_blanks():
     assert s.cors_origin_list() == ["http://a.test", "http://b.test"]
 
 
+def test_cors_origin_list_tolerates_trailing_slash_and_quotes():
+    """Saisie fréquente sur l'hébergeur : « https://site.app/ » ou entre guillemets. Le navigateur envoie sans « / »."""
+    s = Settings(cors_origins="\"https://correxia-vdd9.vercel.app/\", 'http://localhost:3000'")
+    assert s.cors_origin_list() == ["https://correxia-vdd9.vercel.app", "http://localhost:3000"]
+
+
 # ---------------------------------------------------------------- stockage
 
 

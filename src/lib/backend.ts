@@ -1,7 +1,17 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-/** URL de l'API FastAPI (backend/), ex. http://localhost:8000/api/v1 en local. */
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1").replace(/\/$/, "");
+const API_PREFIX = "/api/v1";
+
+/**
+ * URL de l'API FastAPI (backend/). Accepte « https://api.example.com » comme « https://api.example.com/api/v1 » :
+ * l'oubli du préfixe dans la variable d'environnement est une erreur de déploiement fréquente.
+ */
+export function apiBaseUrl(configured: string | undefined): string {
+  const base = (configured || "http://localhost:8000").trim().replace(/\/+$/, "");
+  return base.endsWith(API_PREFIX) ? base : `${base}${API_PREFIX}`;
+}
+
+const API_URL = apiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
 
 /**
  * Appel à l'API métier FastAPI depuis le navigateur, avec le jeton de session Supabase.
