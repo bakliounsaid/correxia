@@ -1,0 +1,24 @@
+# Lint + format du backend :  .venv\Scripts\ruff check .  /  .venv\Scripts\ruff format .
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes (imports / noms inutilisés ou indéfinis)
+    "I",        # tri des imports
+    "B",        # bugbear (pièges courants)
+    "UP",       # syntaxe Python moderne
+    "SIM",      # simplifications
+    "RUF",      # règles ruff
+    "ASYNC",    # pièges asyncio
+    "S",        # sécurité (bandit)
+]
+ignore = [
+    "E501",     # longueur de ligne : gérée par le formateur (les prompts IA restent sur une ligne)
+    "RUF001", "RUF002", "RUF003",  # caractères typographiques français (’ « » …) volontaires
+]
+
+[lint.per-file-ignores]
+# Tests : assert, secrets factices et valeurs aléatoires sont normaux.
+"tests/**" = ["S101", "S105", "S106", "S311"]

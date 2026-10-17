@@ -1,48 +1,29 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import { Download, Play, RotateCcw, Upload } from "lucide-react";
+import { StudentPickerModal, type StudentOption } from "@/components/dashboard/start-test/StudentPickerModal";
 import { Button } from "@/components/ui/Button";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
-  decodeQrFromImageFile,
-  PDF_QR_PNG_WIDTH_PX,
-  PDF_QR_SIZE_MM,
-} from "@/lib/qr-scan";
-
-type StudentOption = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  class_name: string;
-};
-
-type GeneratedCopy = {
-  copy_id: string;
-  unique_test_id: string;
-  student_id: string;
-  first_name: string;
-  last_name: string;
-  class_name: string;
-};
-
-type TestPayload = {
-  id: string;
-  title: string;
-  level: string;
-  duration_minutes?: number | null;
-  questions: unknown;
-};
-
-type CopyUploadTarget = {
-  id: string;
-  created_at: string;
-  status: string;
-  scanned_image_url: string | null;
-  unique_test_id: string | null;
-};
+  type CopyUploadTarget,
+  importSummary,
+  indexCopiesByQr,
+  resolveSheetTarget,
+  SHEET_ERRORS,
+} from "@/lib/answer-sheets";
+import { backendFetch } from "@/lib/backend";
+import { alertError, errorMessage, readApiJson } from "@/lib/error-message";
+import {
+  type AnswerSheetCopy,
+  type AnswerSheetTest,
+  downloadAnswerSheetsPdf,
+  downloadCorrectionTemplatePdf,
+} from "@/lib/evaluation-pdf";
+import { decodeQrFromImageFile } from "@/lib/qr-scan";
+import { getCurrentTeacher, safeStorageName, uploadToTestsBucket } from "@/lib/storage-upload";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 type Props = {
   evaluationId: string;
@@ -60,6 +41,7 @@ type Props = {
   questions?: unknown;
 };
 
+/** Actions d'une évaluation : correction type, lancement de l'examen, dépôt des feuilles, correction IA. */
 function StartTestButtonInner({
   evaluationId,
   status,
@@ -74,194 +56,71 @@ function StartTestButtonInner({
 }: Props) {
   const router = useRouter();
   const normalizedStatus = (status || "").toLowerCase();
-  const isStartableStatus = normalizedStatus === "created" || normalizedStatus === "in_progress";
+  /** Trame + upload / remplacement de la correction type : tant que l’évaluation n’est pas terminée. */
+  const isEditable = normalizedStatus === "created" || normalizedStatus === "in_progress";
   const [hasLocalCorrectionFile, setHasLocalCorrectionFile] = useState(hasCorrectionFile);
-  /** Trame + upload / remplacement correction type : autorisé tant que l’évaluation n’est pas terminée (créée ou en cours). */
-  const canEditCorrectionFiles =
-    normalizedStatus === "created" || normalizedStatus === "in_progress";
   const showStartExam = normalizedStatus === "created" && copyCount === 0;
-  const showDepositSheets = isStartableStatus && copyCount > 0;
+  const showDepositSheets = isEditable && copyCount > 0;
   const showLaunchCorrection =
-    isStartableStatus &&
-    hasLocalCorrectionFile &&
-    hasDepositedCopy &&
-    !allDepositedCopiesValidated;
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+    isEditable && hasLocalCorrectionFile && hasDepositedCopy && !allDepositedCopiesValidated;
+
+  const correctionInputRef = useRef<HTMLInputElement | null>(null);
   const answerSheetsInputRef = useRef<HTMLInputElement | null>(null);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [uploadingCorrection, setUploadingCorrection] = useState(false);
-  const [uploadingAnswerSheets, setUploadingAnswerSheets] = useState(false);
-  const [resettingSheets, setResettingSheets] = useState(false);
-  const [correcting, setCorrecting] = useState(false);
-  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [loadingStudents, setLoadingStudents] = useState(false);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  const selectedCount = useMemo(() => selectedIds.length, [selectedIds]);
+  const [busy, setBusy] = useState<
+    "none" | "start" | "template" | "correction" | "sheets" | "reset" | "ai"
+  >("none");
 
   useEffect(() => {
     setHasLocalCorrectionFile(hasCorrectionFile);
   }, [hasCorrectionFile]);
 
-  async function openModal() {
-    setOpen(true);
-    setLoading(true);
+  async function openStudentPicker() {
+    setPickerOpen(true);
+    setLoadingStudents(true);
     try {
-      const res = await fetch(`/api/dashboard/evaluations/${evaluationId}/start`);
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        students?: StudentOption[];
-      };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "Chargement impossible.");
+      const res = await backendFetch(`/evaluations/${evaluationId}/start`);
+      const data = await readApiJson<{ students?: StudentOption[] }>(res, "Chargement impossible.");
       const rows = data.students ?? [];
       setStudents(rows);
       setSelectedIds(rows.map((s) => s.id));
-    } catch (err: unknown) {
-      setOpen(false);
-      await Swal.fire({
-        icon: "error",
-        title: "Erreur",
-        text:
-          err && typeof err === "object" && "message" in err
-            ? String((err as { message: string }).message)
-            : "Chargement impossible.",
-      });
+    } catch (err) {
+      setPickerOpen(false);
+      await alertError(err, "Chargement impossible.");
     } finally {
-      setLoading(false);
+      setLoadingStudents(false);
     }
   }
 
-  function toggle(studentId: string) {
+  function toggleStudent(studentId: string) {
     setSelectedIds((prev) =>
       prev.includes(studentId) ? prev.filter((id) => id !== studentId) : [...prev, studentId],
     );
   }
 
-  async function generatePrintablePdf(test: TestPayload, copies: GeneratedCopy[]) {
-    const { jsPDF } = await import("jspdf");
-    const QRCode = (await import("qrcode")) as {
-      toDataURL: (
-        text: string,
-        opts?: { margin?: number; width?: number; errorCorrectionLevel?: string },
-      ) => Promise<string>;
-    };
-    const doc = new jsPDF({ unit: "mm", format: "a4" });
-
-    const questions = Array.isArray(test.questions)
-      ? (test.questions as Array<{ text?: string; title?: string; points?: number }>)
-      : [];
-    const normalizedQuestions =
-      questions.length > 0
-        ? questions.map((q, idx) => ({
-            label: q.title || `Exercice ${idx + 1}`,
-            text: q.text || "",
-            points: Number(q.points ?? 0),
-          }))
-        : [{ label: "Exercice 1", text: "", points: 0 }];
-
-    for (let copyIndex = 0; copyIndex < copies.length; copyIndex += 1) {
-      const cp = copies[copyIndex]!;
-      if (copyIndex > 0) doc.addPage();
-      const startPage = doc.getNumberOfPages();
-      const left = 14;
-      const pageWidth = 210 - left * 2;
-      const pageDate = new Date().toLocaleDateString("fr-FR");
-      const durationLabel = test.duration_minutes ? `${test.duration_minutes} min` : "—";
-
-      const drawHeader = () => {
-        doc.setFontSize(10);
-        doc.text(`Établissement: —`, left, 14);
-        doc.text(`Élève: ${cp.last_name} ${cp.first_name}`.trim(), left, 19);
-        doc.text(`Classe: ${cp.class_name || test.level || "—"}`, left, 24);
-
-        doc.setFontSize(16);
-        doc.text(test.title || "Évaluation", 105, 16, { align: "center" });
-        doc.setFontSize(10);
-        doc.text(`Durée: ${durationLabel}`, 105, 22, { align: "center" });
-
-        doc.setFontSize(10);
-        doc.text(`Date: ${pageDate}`, 196, 14, { align: "right" });
-        doc.line(left, 28, left + pageWidth, 28);
-      };
-
-      drawHeader();
-      let y = 34;
-
-      normalizedQuestions.forEach((q) => {
-        doc.setFontSize(12);
-        const pts = q.points > 0 ? ` (${q.points} pts)` : "";
-        doc.text(`${q.label}${pts}`, left, y);
-        y += 5;
-        doc.setFontSize(11);
-        if (q.text) {
-          const wrapped = doc.splitTextToSize(q.text, pageWidth);
-          doc.text(wrapped, left, y);
-          y += wrapped.length * 5 + 2;
-        }
-        const boxHeight = 34;
-        if (y + boxHeight > 285) {
-          doc.addPage();
-          y = 16;
-        }
-        doc.rect(left, y, pageWidth, boxHeight);
-        y += boxHeight + 5;
-      });
-
-      const qrDataUrl = await QRCode.toDataURL(cp.unique_test_id, {
-        margin: 1,
-        width: PDF_QR_PNG_WIDTH_PX,
-        errorCorrectionLevel: "Q",
-      });
-      const qrSize = PDF_QR_SIZE_MM;
-      const endPage = doc.getNumberOfPages();
-      for (let p = startPage; p <= endPage; p += 1) {
-        doc.setPage(p);
-        const qrY = 297 - 8 - qrSize;
-        const qrX = 210 - 14 - qrSize;
-        doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
-      }
-    }
-
-    doc.save(`copies-${(test.title || "evaluation").replace(/[^a-zA-Z0-9-_]/g, "-")}.pdf`);
-  }
-
-  async function onStart() {
+  async function startExam() {
     if (selectedIds.length === 0) {
-      await Swal.fire({
-        icon: "warning",
-        title: "Sélection requise",
-        text: "Sélectionnez au moins un élève.",
-      });
+      await Swal.fire({ icon: "warning", title: "Sélection requise", text: "Sélectionnez au moins un élève." });
       return;
     }
-
-    setSubmitting(true);
+    setBusy("start");
     try {
-      const res = await fetch(`/api/dashboard/evaluations/${evaluationId}/start`, {
+      const res = await backendFetch(`/evaluations/${evaluationId}/start`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studentIds: selectedIds }),
       });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
+      const data = await readApiJson<{
         created?: number;
         already_exists?: number;
-        total_copies?: number;
-        test?: TestPayload;
-        copies?: GeneratedCopy[];
-      };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "Impossible de démarrer le test.");
+        test?: AnswerSheetTest;
+        copies?: AnswerSheetCopy[];
+      }>(res, "Impossible de démarrer le test.");
+      if (data.test && data.copies?.length) await downloadAnswerSheetsPdf(data.test, data.copies);
 
-      const generatedCopies = Array.isArray(data.copies) ? data.copies : [];
-      if (data.test && generatedCopies.length > 0) {
-        await generatePrintablePdf(data.test, generatedCopies);
-      }
-
-      setOpen(false);
+      setPickerOpen(false);
       await Swal.fire({
         icon: "success",
         title: "Feuilles de réponses prêtes",
@@ -269,35 +128,22 @@ function StartTestButtonInner({
         confirmButtonText: "Parfait",
       });
       router.refresh();
-    } catch (err: unknown) {
-      await Swal.fire({
-        icon: "error",
-        title: "Erreur",
-        text:
-          err && typeof err === "object" && "message" in err
-            ? String((err as { message: string }).message)
-            : "Impossible de démarrer le test.",
-      });
+    } catch (err) {
+      await alertError(err, "Impossible de démarrer le test.");
     } finally {
-      setSubmitting(false);
+      setBusy("none");
     }
   }
 
   async function runAiCorrection() {
-    setCorrecting(true);
+    setBusy("ai");
     try {
-      const res = await fetch(`/api/dashboard/evaluations/${evaluationId}/correct`, {
-        method: "POST",
-      });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        corrected?: number;
-        total?: number;
-        failures?: string[];
-      };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "Correction IA impossible.");
-      const failures = Array.isArray(data.failures) ? data.failures : [];
+      const res = await backendFetch(`/evaluations/${evaluationId}/correct`, { method: "POST" });
+      const data = await readApiJson<{ corrected?: number; total?: number; failures?: string[] }>(
+        res,
+        "Correction IA impossible.",
+      );
+      const failures = data.failures ?? [];
       await Swal.fire({
         icon: failures.length ? "warning" : "success",
         title: failures.length ? "Correction partielle" : "Correction terminée",
@@ -306,269 +152,96 @@ function StartTestButtonInner({
         }`,
       });
       router.refresh();
-    } catch (err: unknown) {
-      await Swal.fire({
-        icon: "error",
-        title: "Erreur",
-        text:
-          err && typeof err === "object" && "message" in err
-            ? String((err as { message: string }).message)
-            : "Correction IA impossible.",
-      });
+    } catch (err) {
+      await alertError(err, "Correction IA impossible.");
     } finally {
-      setCorrecting(false);
+      setBusy("none");
     }
   }
 
-  async function onPickCorrectionFile(file: File | null) {
+  async function uploadCorrectionFile(file: File | null) {
     if (!file) return;
-    setUploadingCorrection(true);
+    setBusy("correction");
     try {
       const supabase = getSupabaseBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Session expirée. Reconnectez-vous.");
-
-      const { data: teacher } = await supabase
-        .from("teachers")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!teacher?.id) throw new Error("Profil enseignant introuvable.");
-
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
-      const storagePath = `${teacher.id}/${evaluationId}/correction-${Date.now()}-${safeName}`;
-      const { error: uploadErr } = await supabase.storage.from("tests").upload(storagePath, file, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: file.type || "application/octet-stream",
-      });
-      if (uploadErr) throw new Error(`Upload impossible (${uploadErr.message}).`);
-
-      const { data: publicData } = supabase.storage.from("tests").getPublicUrl(storagePath);
-      const res = await fetch(`/api/dashboard/evaluations/${evaluationId}`, {
+      const teacher = await getCurrentTeacher(supabase);
+      const path = `${teacher.id}/${evaluationId}/correction-${Date.now()}-${safeStorageName(file.name)}`;
+      const url = await uploadToTestsBucket(supabase, path, file, file.type || "application/octet-stream");
+      const res = await backendFetch(`/evaluations/${evaluationId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          correction_file_url: publicData.publicUrl,
-          correction_file_name: file.name,
-        }),
+        body: JSON.stringify({ correction_file_url: url, correction_file_name: file.name }),
       });
-      const json = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !json.ok) throw new Error(json.error ?? "Mise à jour impossible.");
+      await readApiJson(res, "Mise à jour impossible.");
 
-      await Swal.fire({
-        icon: "success",
-        title: "Correction type ajoutée",
-        timer: 1200,
-        showConfirmButton: false,
-      });
+      await Swal.fire({ icon: "success", title: "Correction type ajoutée", timer: 1200, showConfirmButton: false });
       setHasLocalCorrectionFile(true);
       router.refresh();
-    } catch (err: unknown) {
-      await Swal.fire({
-        icon: "error",
-        title: "Erreur",
-        text:
-          err && typeof err === "object" && "message" in err
-            ? String((err as { message: string }).message)
-            : "Upload impossible.",
-      });
+    } catch (err) {
+      await alertError(err, "Upload impossible.");
     } finally {
-      setUploadingCorrection(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setBusy("none");
+      if (correctionInputRef.current) correctionInputRef.current.value = "";
     }
   }
 
   async function downloadCorrectionTemplate() {
-    setDownloadingTemplate(true);
+    setBusy("template");
     try {
-    const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF({ unit: "mm", format: "a4" });
-    const left = 14;
-    const pageWidth = 210 - left * 2;
-    let y = 16;
-    const items = Array.isArray(questions)
-      ? (questions as Array<{ title?: string; text?: string; points?: number }>)
-      : [];
-    const normalized =
-      items.length > 0
-        ? items.map((q, idx) => ({
-            label: q.title || `Exercice ${idx + 1}`,
-            text: q.text || "",
-            points: Number(q.points ?? 0),
-          }))
-        : [{ label: "Exercice 1", text: "", points: 0 }];
-
-    doc.setFontSize(15);
-    doc.text(`Trame de correction type - ${evaluationTitle || "Evaluation"}`, left, y);
-    y += 7;
-    doc.setFontSize(10);
-    doc.text(`Classe: ${classLabel || "—"}   Duree: ${durationMinutes ?? "—"} min`, left, y);
-    y += 8;
-    doc.text("Document enseignant: remplir la correction attendue pour chaque exercice.", left, y);
-    y += 8;
-
-    normalized.forEach((q) => {
-      if (y > 245) {
-        doc.addPage();
-        y = 16;
-      }
-      doc.setFontSize(12);
-      const pts = q.points > 0 ? ` (${q.points} pts)` : "";
-      doc.text(`${q.label}${pts}`, left, y);
-      y += 5;
-      doc.setFontSize(10);
-      if (q.text) {
-        const wrapped = doc.splitTextToSize(q.text, pageWidth);
-        doc.text(wrapped, left, y);
-        y += wrapped.length * 4.5 + 2;
-      }
-      doc.setFontSize(10);
-      doc.text("Correction attendue (type):", left, y);
-      y += 3;
-      const boxHeight = 52;
-      doc.rect(left, y, pageWidth, boxHeight);
-      y += boxHeight + 6;
-    });
-
-    doc.save(`trame-correction-type-${(evaluationTitle || "evaluation").replace(/[^a-zA-Z0-9-_]/g, "-")}.pdf`);
+      await downloadCorrectionTemplatePdf({ title: evaluationTitle, classLabel, durationMinutes, questions });
     } finally {
-      setDownloadingTemplate(false);
+      setBusy("none");
     }
   }
 
-  async function onUploadAllAnswerSheets(files: FileList | null) {
+  async function importAnswerSheets(files: FileList | null) {
     if (!files || files.length === 0) return;
-    setUploadingAnswerSheets(true);
+    setBusy("sheets");
     try {
       const supabase = getSupabaseBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Session expirée. Reconnectez-vous.");
-
-      const { data: teacher } = await supabase
-        .from("teachers")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!teacher?.id) throw new Error("Profil enseignant introuvable.");
-
-      const copiesRes = await fetch(`/api/dashboard/evaluations/${evaluationId}/copies`);
-      const copiesJson = (await copiesRes.json()) as {
-        ok?: boolean;
-        error?: string;
-        copies?: CopyUploadTarget[];
-      };
-      if (!copiesRes.ok || !copiesJson.ok) {
-        throw new Error(copiesJson.error ?? "Chargement des copies impossible.");
-      }
-      const targets = (copiesJson.copies ?? []).sort((a, b) =>
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      const teacher = await getCurrentTeacher(supabase);
+      const res = await backendFetch(`/evaluations/${evaluationId}/copies`);
+      const { copies = [] } = await readApiJson<{ copies?: CopyUploadTarget[] }>(
+        res,
+        "Chargement des copies impossible.",
       );
-      if (targets.length === 0) {
-        throw new Error("Aucune copie disponible. Lancez d'abord la génération des copies.");
-      }
+      if (copies.length === 0) throw new Error("Aucune copie disponible. Lancez d'abord la génération des copies.");
 
-      const inputFiles = Array.from(files);
-      const availableByQr = new Map(
-        targets
-          .filter((t) => Boolean(t.unique_test_id))
-          .map((t) => [t.unique_test_id as string, t]),
-      );
-      const consumedCopyIds = new Set<string>();
-      let successCount = 0;
+      const copiesByQr = indexCopiesByQr(copies);
+      const imported = new Set<string>();
       const failures: string[] = [];
-
-      for (let i = 0; i < inputFiles.length; i += 1) {
-        const f = inputFiles[i];
+      // Séquentiel : chaque scan est décodé puis rattaché à sa copie, un doublon de QR est refusé.
+      for (const file of Array.from(files)) {
         try {
-          if (!f.type.startsWith("image/")) {
-            throw new Error(
-              "Format non supporté pour la lecture du QR : utilisez une photo ou un scan JPG ou PNG (pas de PDF).",
-            );
-          }
-          const qrValue = await decodeQrFromImageFile(f);
-          if (!qrValue) {
-            throw new Error(
-              "QR code introuvable ou illisible : exportez la page en entier (évitez le zoom sur une zone), bonne lumière, pas de flou. Les applis « PDF Scanner » avec grosses marges noires posent souvent problème — préférez une photo de la feuille seule ou régénérez les copies (QR plus grand).",
-            );
-          }
-          const target = availableByQr.get(qrValue);
-          if (!target) {
-            throw new Error("QR code non lié à une copie de ce test");
-          }
-          if (consumedCopyIds.has(target.id)) {
-            throw new Error("copie déjà importée dans ce lot (doublon QR)");
-          }
-
-          const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, "-").toLowerCase();
-          const storagePath = `${teacher.id}/${evaluationId}/answer-sheets/${target.id}-${Date.now()}-${safeName}`;
-          const { error: uploadErr } = await supabase.storage.from("tests").upload(storagePath, f, {
-            cacheControl: "3600",
-            upsert: false,
-            contentType: f.type || "application/octet-stream",
-          });
-          if (uploadErr) throw new Error(uploadErr.message);
-
-          const { data: publicData } = supabase.storage.from("tests").getPublicUrl(storagePath);
-          const patchRes = await fetch(`/api/dashboard/evaluations/${evaluationId}/copies/${target.id}`, {
+          if (!file.type.startsWith("image/")) throw new Error(SHEET_ERRORS.notImage);
+          const target = resolveSheetTarget(await decodeQrFromImageFile(file), copiesByQr, imported);
+          const path = `${teacher.id}/${evaluationId}/answer-sheets/${target.id}-${Date.now()}-${safeStorageName(file.name)}`;
+          const url = await uploadToTestsBucket(supabase, path, file, file.type || "application/octet-stream");
+          const patch = await backendFetch(`/evaluations/${evaluationId}/copies/${target.id}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              scanned_image_url: publicData.publicUrl,
-              status: "submitted",
-            }),
+            body: JSON.stringify({ scanned_image_url: url, status: "submitted" }),
           });
-          const patchJson = (await patchRes.json()) as { ok?: boolean; error?: string };
-          if (!patchRes.ok || !patchJson.ok) {
-            throw new Error(patchJson.error ?? "Mise à jour copie impossible.");
-          }
-          consumedCopyIds.add(target.id);
-          successCount += 1;
-        } catch (err: unknown) {
-          failures.push(
-            `${f.name}: ${
-              err && typeof err === "object" && "message" in err
-                ? String((err as { message: string }).message)
-                : "échec upload"
-            }`,
-          );
+          await readApiJson(patch, "Mise à jour copie impossible.");
+          imported.add(target.id);
+        } catch (err) {
+          failures.push(`${file.name}: ${errorMessage(err, "échec upload")}`);
         }
       }
-
-      const summary = [
-        `${successCount} feuille(s) importée(s).`,
-        `${targets.length - consumedCopyIds.size} copie(s) sans feuille valide.`,
-        failures.length > 0 ? `Erreurs: ${failures.slice(0, 2).join(" | ")}` : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
 
       await Swal.fire({
         icon: failures.length > 0 ? "warning" : "success",
         title: failures.length > 0 ? "Import partiel" : "Import terminé",
-        text: summary,
+        text: importSummary(imported.size, copies.length, failures),
       });
       router.refresh();
-    } catch (err: unknown) {
-      await Swal.fire({
-        icon: "error",
-        title: "Erreur",
-        text:
-          err && typeof err === "object" && "message" in err
-            ? String((err as { message: string }).message)
-            : "Import des feuilles impossible.",
-      });
+    } catch (err) {
+      await alertError(err, "Import des feuilles impossible.");
     } finally {
-      setUploadingAnswerSheets(false);
+      setBusy("none");
       if (answerSheetsInputRef.current) answerSheetsInputRef.current.value = "";
     }
   }
 
-  async function onResetImportedSheets() {
+  async function resetImportedSheets() {
     const confirm = await Swal.fire({
       icon: "warning",
       title: "Réinitialiser les feuilles importées ?",
@@ -580,37 +253,20 @@ function StartTestButtonInner({
     });
     if (!confirm.isConfirmed) return;
 
-    setResettingSheets(true);
+    setBusy("reset");
     try {
-      const res = await fetch(`/api/dashboard/evaluations/${evaluationId}/reset-imports`, {
-        method: "POST",
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        error?: string;
-        reset_imported_sheets?: number;
-      };
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error ?? "Réinitialisation impossible.");
-      }
-
+      const res = await backendFetch(`/evaluations/${evaluationId}/reset-imports`, { method: "POST" });
+      const data = await readApiJson<{ reset_imported_sheets?: number }>(res, "Réinitialisation impossible.");
       await Swal.fire({
         icon: "success",
         title: "Réinitialisation terminée",
         text: `${data.reset_imported_sheets ?? 0} feuille(s) importée(s) supprimée(s). Vous pouvez réimporter de nouvelles feuilles.`,
       });
       router.refresh();
-    } catch (err: unknown) {
-      await Swal.fire({
-        icon: "error",
-        title: "Erreur",
-        text:
-          err && typeof err === "object" && "message" in err
-            ? String((err as { message: string }).message)
-            : "Réinitialisation impossible.",
-      });
+    } catch (err) {
+      await alertError(err, "Réinitialisation impossible.");
     } finally {
-      setResettingSheets(false);
+      setBusy("none");
     }
   }
 
@@ -622,8 +278,8 @@ function StartTestButtonInner({
           variant="outline"
           className="border-gray-200"
           onClick={() => void downloadCorrectionTemplate()}
-          disabled={!canEditCorrectionFiles || downloadingTemplate}
-          loading={downloadingTemplate}
+          disabled={!isEditable || busy !== "none"}
+          loading={busy === "template"}
           loadingText="Préparation du PDF…"
           title="Télécharger une trame dédiée à la correction type (document enseignant)"
         >
@@ -634,14 +290,10 @@ function StartTestButtonInner({
           type="button"
           variant="outline"
           className="border-gray-200"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={!canEditCorrectionFiles || uploadingCorrection}
-          title={
-            canEditCorrectionFiles
-              ? "Uploader la correction type"
-              : "Le test n'est plus modifiable"
-          }
-          loading={uploadingCorrection}
+          onClick={() => correctionInputRef.current?.click()}
+          disabled={!isEditable || busy !== "none"}
+          title={isEditable ? "Uploader la correction type" : "Le test n'est plus modifiable"}
+          loading={busy === "correction"}
           loadingText="Upload..."
         >
           <Upload className="h-4 w-4" />
@@ -653,8 +305,8 @@ function StartTestButtonInner({
             variant="outline"
             className="border-gray-200"
             onClick={() => answerSheetsInputRef.current?.click()}
-            disabled={uploadingAnswerSheets}
-            loading={uploadingAnswerSheets}
+            disabled={busy !== "none"}
+            loading={busy === "sheets"}
             loadingText="Import..."
             title="Déposer les feuilles d'examen scannées (import multiple, QR)"
           >
@@ -667,9 +319,9 @@ function StartTestButtonInner({
             type="button"
             variant="outline"
             className="border-red-200 text-red-700 hover:bg-red-50"
-            onClick={() => void onResetImportedSheets()}
-            disabled={resettingSheets}
-            loading={resettingSheets}
+            onClick={() => void resetImportedSheets()}
+            disabled={busy !== "none"}
+            loading={busy === "reset"}
             loadingText="Réinitialisation..."
             title="Supprimer les feuilles importées et les corrections IA liées pour réimporter proprement"
           >
@@ -678,11 +330,11 @@ function StartTestButtonInner({
           </Button>
         ) : null}
         <input
-          ref={fileInputRef}
+          ref={correctionInputRef}
           type="file"
           accept=".pdf,.doc,.docx,image/*"
           className="hidden"
-          onChange={(e) => void onPickCorrectionFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => void uploadCorrectionFile(e.target.files?.[0] ?? null)}
         />
         <input
           ref={answerSheetsInputRef}
@@ -690,14 +342,14 @@ function StartTestButtonInner({
           multiple
           accept=".pdf,image/*"
           className="hidden"
-          onChange={(e) => void onUploadAllAnswerSheets(e.target.files)}
+          onChange={(e) => void importAnswerSheets(e.target.files)}
         />
         {showStartExam ? (
           <Button
             type="button"
             variant="primary"
-            onClick={() => void openModal()}
-            disabled={!isStartableStatus}
+            onClick={() => void openStudentPicker()}
+            disabled={!isEditable || busy !== "none"}
             title="Choisir les élèves et générer les feuilles de réponses (PDF)"
           >
             <Play className="h-4 w-4" />
@@ -709,9 +361,9 @@ function StartTestButtonInner({
             type="button"
             variant="primary"
             onClick={() => void runAiCorrection()}
-            disabled={correcting}
+            disabled={busy !== "none"}
             title="Lancer la correction OCR + IA sur les copies déposées"
-            loading={correcting}
+            loading={busy === "ai"}
             loadingText="Correction IA…"
           >
             <Play className="h-4 w-4" />
@@ -720,72 +372,19 @@ function StartTestButtonInner({
         ) : null}
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Sélectionner les élèves pour ce test
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Chaque copie aura un code unique par élève.
-            </p>
-
-            <div className="mt-4 max-h-[50vh] overflow-auto rounded-xl border border-gray-100">
-              {loading ? (
-                <p className="px-4 py-6 text-sm text-gray-500">Chargement des élèves...</p>
-              ) : students.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-gray-500">Aucun élève disponible.</p>
-              ) : (
-                <ul className="divide-y divide-gray-100">
-                  {students.map((s) => {
-                    const checked = selectedIds.includes(s.id);
-                    return (
-                      <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                        <label className="flex items-center gap-3 text-sm text-gray-800">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggle(s.id)}
-                            className="h-4 w-4 rounded border-gray-300 text-primary-600"
-                          />
-                          <span>
-                            {s.last_name} {s.first_name}
-                          </span>
-                        </label>
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                          {s.class_name}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-gray-600">{selectedCount} élève(s) sélectionné(s)</p>
-              <div className="flex gap-2">
-                <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
-                  Annuler
-                </Button>
-                <Button
-                  type="button"
-                  variant="success"
-                  onClick={() => void onStart()}
-                  disabled={submitting || loading || students.length === 0}
-                  loading={submitting}
-                  loadingText="Génération des copies…"
-                >
-                  Télécharger les feuilles de réponses
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {pickerOpen && (
+        <StudentPickerModal
+          students={students}
+          selectedIds={selectedIds}
+          loading={loadingStudents}
+          submitting={busy === "start"}
+          onToggle={toggleStudent}
+          onCancel={() => setPickerOpen(false)}
+          onConfirm={() => void startExam()}
+        />
       )}
     </>
   );
 }
 
 export const StartTestButton = memo(StartTestButtonInner);
-

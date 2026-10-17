@@ -1,0 +1,47 @@
+{
+  "_comment": "Source unique des offres : lue par le backend (app/plans.py) et importée au build par le frontend (src/lib/plans.ts). Prix en centimes ; null = illimité / sur devis. Seule exception : school.evaluation.trial_days est aussi écrit dans le trigger SQL handle_new_user (supabase/migrations), vérifié par tests/test_unit_billing.py.",
+  "teacher": {
+    "essential": {
+      "name": "Pack ESSENTIEL",
+      "price_cents": 0,
+      "copy_limit": 40,
+      "access_days": 30,
+      "history_days": 30
+    },
+    "advanced": {
+      "name": "Pack AVANCÉ",
+      "price_cents": 4500,
+      "billing_period": "quarterly",
+      "copy_limit": 250,
+      "copy_window_days": 90
+    },
+    "mastery": {
+      "name": "Pack MAÎTRISE",
+      "price_cents": 7900,
+      "billing_period": "quarterly",
+      "copy_limit": null
+    }
+  },
+  "school": {
+    "evaluation": {
+      "name": "Accès ÉVALUATION",
+      "price_cents": 0,
+      "trial_days": 14,
+      "max_teachers": 3,
+      "copy_limit": null
+    },
+    "establishment": {
+      "name": "Pack ÉTABLISSEMENT",
+      "price_cents": 30000,
+      "billing_period": "quarterly",
+      "max_teachers": 10,
+      "copy_limit": null
+    },
+    "institution": {
+      "name": "Pack INSTITUTION",
+      "price_cents": null,
+      "max_teachers": null,
+      "copy_limit": null
+    }
+  }
+}

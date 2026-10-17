@@ -220,5 +220,3 @@ export function findPlatformAnswer(userMessage: string): {
 
   return { entry: null, text: DEFAULT_ANSWER };
 }
-
-export const QUICK_PROMPTS: { label: string; send: string }[] = [];

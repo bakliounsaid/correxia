@@ -4,6 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import Swal from "sweetalert2";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { backendFetch } from "@/lib/backend";
+import { formatPrice, PLAN_TEXT, SCHOOL_PLANS, TEACHER_PLANS } from "@/lib/plans";
+
+const { essential, advanced, mastery } = TEACHER_PLANS;
+const { evaluation, establishment, institution } = SCHOOL_PLANS;
 
 type Feature = { label: string; included: boolean };
 
@@ -19,7 +24,8 @@ type Plan = {
   features: Feature[];
   footnote?: string;
   stripe?: {
-    endpoint: "/api/billing/teacher-checkout" | "/api/billing/school-checkout";
+    /** Route de l'API FastAPI (src/lib/backend.ts) */
+    endpoint: "/billing/teacher-checkout" | "/billing/school-checkout";
     payload: Record<string, unknown>;
     /** redirection si utilisateur non autorisé */
     fallbackHref: string;
@@ -28,39 +34,39 @@ type Plan = {
 
 const b2cPlans: Plan[] = [
   {
-    name: "Pack ESSENTIEL",
+    name: essential.name,
     badge: "Freemium",
-    price: "0€",
+    price: formatPrice(essential.price_cents),
     priceNote: "Gratuit",
     cta: "Commencer gratuitement",
     href: "/register",
     ctaStyle: "outline",
     features: [
-      { label: "Jusqu’à 40 copies", included: true },
-      { label: "Accès 30 jours ou 40 copies (le premier atteint bloque)", included: true },
+      { label: PLAN_TEXT.essentialCopies, included: true },
+      { label: `${PLAN_TEXT.essentialAccess} (le premier atteint bloque)`, included: true },
       { label: "Scan et correction basique", included: true },
-      { label: "Historique limité à 30 jours", included: true },
+      { label: PLAN_TEXT.essentialHistory, included: true },
       { label: "Analyse détaillée du raisonnement", included: false },
       { label: "Statistiques avancées", included: false },
       { label: "Feedback IA automatique", included: false },
     ],
-    footnote: "Blocage automatique après 30 jours ou 40 copies.",
+    footnote: `Blocage automatique après ${essential.access_days} jours ou ${essential.copy_limit} copies.`,
   },
   {
-    name: "Pack AVANCÉ",
-    price: "45€",
+    name: advanced.name,
+    price: formatPrice(advanced.price_cents),
     priceNote: "par trimestre (3 mois)",
     highlight: true,
     cta: "Choisir Avancé",
     href: "/register",
     stripe: {
-      endpoint: "/api/billing/teacher-checkout",
+      endpoint: "/billing/teacher-checkout",
       payload: { plan: "advanced" },
       fallbackHref: "/register",
     },
     ctaStyle: "primary",
     features: [
-      { label: "Jusqu’à 250 copies par trimestre", included: true },
+      { label: PLAN_TEXT.advancedCopies, included: true },
       { label: "Durée : 3 mois (calendrier scolaire)", included: true },
       { label: "Scan et correction complète", included: true },
       { label: "Analyse détaillée du raisonnement", included: true },
@@ -70,16 +76,16 @@ const b2cPlans: Plan[] = [
       { label: "Feedback IA automatique", included: false },
       { label: "Traitement prioritaire", included: false },
     ],
-    footnote: "Accès bloqué après 250 copies sur la période.",
+    footnote: `Accès bloqué après ${advanced.copy_limit} copies sur la période.`,
   },
   {
-    name: "Pack MAÎTRISE",
-    price: "79€",
+    name: mastery.name,
+    price: formatPrice(mastery.price_cents),
     priceNote: "par trimestre (3 mois)",
     cta: "Choisir Maîtrise",
     href: "/register",
     stripe: {
-      endpoint: "/api/billing/teacher-checkout",
+      endpoint: "/billing/teacher-checkout",
       payload: { plan: "mastery" },
       fallbackHref: "/register",
     },
@@ -100,15 +106,15 @@ const b2cPlans: Plan[] = [
 
 const b2bPlans: Plan[] = [
   {
-    name: "Accès ÉVALUATION",
+    name: evaluation.name,
     badge: "Démo gratuite",
-    price: "0€",
-    priceNote: "14 jours fixes",
+    price: formatPrice(evaluation.price_cents),
+    priceNote: PLAN_TEXT.trialDays,
     cta: "Demander la démo",
     href: "/register-school",
     ctaStyle: "outline",
     features: [
-      { label: "Jusqu’à 3 enseignants", included: true },
+      { label: PLAN_TEXT.maxTeachers(evaluation.max_teachers), included: true },
       { label: "Copies illimitées pendant la période test", included: true },
       { label: "Toutes les matières scientifiques", included: true },
       { label: "Scan et correction complète", included: true },
@@ -118,23 +124,23 @@ const b2bPlans: Plan[] = [
       { label: "Archivage long terme après la période", included: false },
       { label: "Export final après la période", included: false },
     ],
-    footnote: "Données supprimées après 14 jours — pas de sauvegarde longue durée.",
+    footnote: `Données supprimées après ${evaluation.trial_days} jours — pas de sauvegarde longue durée.`,
   },
   {
-    name: "Pack ÉTABLISSEMENT",
-    price: "300€",
+    name: establishment.name,
+    price: formatPrice(establishment.price_cents),
     priceNote: "par trimestre (3 mois)",
     highlight: true,
     cta: "Souscrire pour mon établissement",
     href: "/register-school",
     stripe: {
-      endpoint: "/api/billing/school-checkout",
+      endpoint: "/billing/school-checkout",
       payload: { plan: "establishment" },
       fallbackHref: "/register-school",
     },
     ctaStyle: "primary",
     features: [
-      { label: "Jusqu’à 10 enseignants", included: true },
+      { label: PLAN_TEXT.maxTeachers(establishment.max_teachers), included: true },
       { label: "Copies illimitées par trimestre", included: true },
       { label: "Toutes les matières scientifiques", included: true },
       { label: "Scan et correction complète", included: true },
@@ -144,11 +150,11 @@ const b2bPlans: Plan[] = [
       { label: "Archivage sécurisé conforme RGPD", included: true },
       { label: "Formation initiale et support dédié", included: true },
     ],
-    footnote: "Facturation trimestrielle. Au-delà de 10 enseignants → Pack Institution.",
+    footnote: `Facturation trimestrielle. Au-delà de ${establishment.max_teachers} enseignants → ${institution.name}.`,
   },
   {
-    name: "Pack INSTITUTION",
-    price: "Sur devis",
+    name: institution.name,
+    price: formatPrice(institution.price_cents),
     priceNote: "Offre personnalisée",
     cta: "Nous contacter",
     href: "/#contact",
@@ -232,9 +238,8 @@ function PlanCard({ plan }: { plan: Plan }) {
             try {
               const stripe = plan.stripe;
               if (!stripe) return;
-              const res = await fetch(stripe.endpoint, {
+              const res = await backendFetch(stripe.endpoint, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(stripe.payload),
               });
               const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };

@@ -10,6 +10,7 @@ import {
   teacherPlanLabel,
   type TeacherOffer,
 } from "@/lib/teacher-billing-plans";
+import { backendFetch } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 
 type TeacherRow = {
@@ -50,7 +51,7 @@ export function TeacherAbonnementClient({
 
   const verifySession = useCallback(
     async (sid: string) => {
-      const res = await fetch("/api/billing/teacher-checkout/verify", {
+      const res = await backendFetch("/billing/teacher-checkout/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: sid }),
@@ -87,7 +88,7 @@ export function TeacherAbonnementClient({
     setPaying(offer.id);
     setBanner(null);
     try {
-      const res = await fetch("/api/billing/teacher-checkout", {
+      const res = await backendFetch("/billing/teacher-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: offer.checkoutPlan }),

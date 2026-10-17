@@ -1,4 +1,6 @@
-/** Offres affichées aux administrateurs d’établissement (aligné sur la page d’accueil). */
+/** Offres établissement. Chiffres : src/lib/plans.ts (source unique backend/app/plans.json). */
+
+import { formatPrice, PLAN_TEXT, SCHOOL_PLANS } from "@/lib/plans";
 
 export type SchoolOfferId = "evaluation" | "establishment" | "institution";
 
@@ -21,14 +23,14 @@ export type SchoolOffer = {
 export const SCHOOL_OFFERS: SchoolOffer[] = [
   {
     id: "evaluation",
-    name: "Accès ÉVALUATION",
+    name: SCHOOL_PLANS.evaluation.name,
     badge: "Démo gratuite",
-    priceLabel: "0€",
-    priceNote: "14 jours fixes",
+    priceLabel: formatPrice(SCHOOL_PLANS.evaluation.price_cents),
+    priceNote: PLAN_TEXT.trialDays,
     ctaLabel: "En savoir plus",
     externalHref: "/register-school",
     features: [
-      "Jusqu’à 3 enseignants",
+      PLAN_TEXT.maxTeachers(SCHOOL_PLANS.evaluation.max_teachers),
       "Copies illimitées pendant la période test",
       "Toutes les matières scientifiques",
       "Dashboard enseignant et directeur",
@@ -37,14 +39,14 @@ export const SCHOOL_OFFERS: SchoolOffer[] = [
   },
   {
     id: "establishment",
-    name: "Pack ÉTABLISSEMENT",
-    priceLabel: "300€",
+    name: SCHOOL_PLANS.establishment.name,
+    priceLabel: formatPrice(SCHOOL_PLANS.establishment.price_cents),
     priceNote: "par trimestre (3 mois)",
     highlight: true,
     checkoutPlan: "establishment",
     ctaLabel: "Payer et souscrire",
     features: [
-      "Jusqu’à 10 enseignants",
+      PLAN_TEXT.maxTeachers(SCHOOL_PLANS.establishment.max_teachers),
       "Copies illimitées par trimestre",
       "Dashboard enseignant + vue directeur",
       "Statistiques consolidées établissement",
@@ -54,8 +56,8 @@ export const SCHOOL_OFFERS: SchoolOffer[] = [
   },
   {
     id: "institution",
-    name: "Pack INSTITUTION",
-    priceLabel: "Sur devis",
+    name: SCHOOL_PLANS.institution.name,
+    priceLabel: formatPrice(SCHOOL_PLANS.institution.price_cents),
     priceNote: "Offre personnalisée",
     ctaLabel: "Nous contacter",
     externalHref: "/#contact",
@@ -77,8 +79,8 @@ export const SCHOOL_UPGRADE_OFFERS: SchoolOffer[] = SCHOOL_OFFERS.filter(
 export function offerLabelFromPlan(plan: string | null | undefined): string {
   if (!plan) return "Aucune offre référencée";
   const p = plan.toLowerCase();
-  if (p.includes("institution")) return "Pack INSTITUTION";
-  if (p.includes("establishment") || p.includes("établissement")) return "Pack ÉTABLISSEMENT";
-  if (p.includes("eval") || p.includes("démo") || p.includes("demo")) return "Accès ÉVALUATION";
+  if (p.includes("institution")) return SCHOOL_PLANS.institution.name;
+  if (p.includes("establishment") || p.includes("établissement")) return SCHOOL_PLANS.establishment.name;
+  if (p.includes("eval") || p.includes("démo") || p.includes("demo")) return SCHOOL_PLANS.evaluation.name;
   return plan;
 }

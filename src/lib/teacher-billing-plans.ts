@@ -1,4 +1,6 @@
-/** Packs enseignant individuel (hors offre gratuite Essentiel). */
+/** Packs enseignant individuel. Chiffres : src/lib/plans.ts (source unique backend/app/plans.json). */
+
+import { formatPrice, PLAN_TEXT, TEACHER_PLANS } from "@/lib/plans";
 
 export type TeacherOfferId = "essential" | "advanced" | "mastery";
 
@@ -21,30 +23,30 @@ export type TeacherOffer = {
 export const TEACHER_OFFERS: TeacherOffer[] = [
   {
     id: "essential",
-    name: "Pack ESSENTIEL",
+    name: TEACHER_PLANS.essential.name,
     badge: "Freemium",
-    priceLabel: "0€",
+    priceLabel: formatPrice(TEACHER_PLANS.essential.price_cents),
     priceNote: "Gratuit",
     ctaLabel: "Créer un compte",
     externalHref: "/register",
     features: [
-      "Jusqu’à 40 copies",
-      "Accès 30 jours ou 40 copies",
+      PLAN_TEXT.essentialCopies,
+      PLAN_TEXT.essentialAccess,
       "Scan et correction basique",
-      "Historique limité à 30 jours",
+      PLAN_TEXT.essentialHistory,
     ],
     footnote: "Déjà inclus pour les comptes gratuits.",
   },
   {
     id: "advanced",
-    name: "Pack AVANCÉ",
-    priceLabel: "45€",
+    name: TEACHER_PLANS.advanced.name,
+    priceLabel: formatPrice(TEACHER_PLANS.advanced.price_cents),
     priceNote: "par trimestre (3 mois)",
     highlight: true,
     checkoutPlan: "advanced",
     ctaLabel: "Payer et souscrire",
     features: [
-      "Jusqu’à 250 copies par trimestre",
+      PLAN_TEXT.advancedCopies,
       "Scan et correction complète",
       "Analyse du raisonnement et des calculs",
       "Statistiques par élève",
@@ -54,8 +56,8 @@ export const TEACHER_OFFERS: TeacherOffer[] = [
   },
   {
     id: "mastery",
-    name: "Pack MAÎTRISE",
-    priceLabel: "79€",
+    name: TEACHER_PLANS.mastery.name,
+    priceLabel: formatPrice(TEACHER_PLANS.mastery.price_cents),
     priceNote: "par trimestre (3 mois)",
     checkoutPlan: "mastery",
     ctaLabel: "Payer et souscrire",
@@ -76,10 +78,10 @@ export const TEACHER_UPGRADE_OFFERS: TeacherOffer[] = TEACHER_OFFERS.filter(
 );
 
 export function teacherPlanLabel(plan: string | null | undefined): string {
-  if (!plan) return "Pack ESSENTIEL (gratuit)";
+  if (!plan) return `${TEACHER_PLANS.essential.name} (gratuit)`;
   const p = plan.toLowerCase();
-  if (p === "mastery" || p.includes("maîtrise") || p.includes("mastery")) return "Pack MAÎTRISE";
-  if (p === "advanced" || p.includes("avancé") || p.includes("advanced")) return "Pack AVANCÉ";
-  if (p === "free" || p.includes("essentiel")) return "Pack ESSENTIEL";
+  if (p === "mastery" || p.includes("maîtrise") || p.includes("mastery")) return TEACHER_PLANS.mastery.name;
+  if (p === "advanced" || p.includes("avancé") || p.includes("advanced")) return TEACHER_PLANS.advanced.name;
+  if (p === "free" || p.includes("essentiel")) return TEACHER_PLANS.essential.name;
   return plan;
 }

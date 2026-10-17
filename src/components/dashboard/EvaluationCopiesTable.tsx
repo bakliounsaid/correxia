@@ -10,6 +10,7 @@ import { ListExportButton } from "@/components/ui/ListExportButton";
 import { PDF_QR_PNG_WIDTH_PX, PDF_QR_SIZE_MM } from "@/lib/qr-scan";
 import { TableSelectCheckbox } from "@/components/ui/TableSelectCheckbox";
 import { useRowSelection } from "@/hooks/useRowSelection";
+import { backendFetch } from "@/lib/backend";
 import { omitId } from "@/lib/utils";
 import { CopyReviewWorkspace } from "@/components/dashboard/CopyReviewWorkspace";
 
@@ -90,8 +91,8 @@ function EvaluationCopiesTableInner({
     setReviewLoading(true);
     void (async () => {
       try {
-        const res = await fetch(
-          `/api/dashboard/evaluations/${evaluationId}/copies/${reviewCopyId}/review-data`,
+        const res = await backendFetch(
+          `/evaluations/${evaluationId}/copies/${reviewCopyId}/review-data`,
         );
         const json = (await res.json()) as {
           ok?: boolean;

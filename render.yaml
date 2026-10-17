@@ -1,0 +1,64 @@
+# Déploiement du backend FastAPI sur Render (Blueprint : Render → New → Blueprint → ce dépôt).
+# Le frontend Next.js se déploie séparément sur Vercel (racine du dépôt).
+services:
+  - type: web
+    name: correxia-api
+    runtime: python
+    rootDir: backend
+    region: frankfurt
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.7
+      - key: DEBUG
+        value: "false"
+      # URL publique du frontend Vercel (CORS + retours Stripe), ex. https://correxia.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      # Supabase → Connect → Connection string → Session pooler (avec le mot de passe de la base)
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      # Stripe → Webhooks → endpoint https://<ce-service>.onrender.com/api/v1/billing/webhook
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ADVANCED_QUARTERLY
+        sync: false
+      - key: STRIPE_PRICE_MASTERY_QUARTERLY
+        sync: false
+      - key: STRIPE_PRICE_ESTABLISHMENT_QUARTERLY
+        sync: false
+      - key: HUBSPOT_ACCESS_TOKEN
+        sync: false
+      - key: HUBSPOT_ROLE_PROPERTY
+        sync: false
+      - key: HUBSPOT_SUBJECT_PROPERTY
+        sync: false
+      - key: HUBSPOT_MESSAGE_PROPERTY
+        sync: false
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_ENCRYPTION
+        sync: false
+      - key: MAIL_FROM_NAME
+        sync: false

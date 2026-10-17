@@ -9,6 +9,3 @@ export const ACCOUNT_TYPE = {
   /** Admin plateforme — créé via script Admin API, pas via /register */
   PLATFORM_ADMIN: "platform_admin",
 } as const;
-
-export type AccountType =
-  (typeof ACCOUNT_TYPE)[keyof typeof ACCOUNT_TYPE];

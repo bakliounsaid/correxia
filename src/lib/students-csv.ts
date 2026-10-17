@@ -12,6 +12,8 @@ export const STUDENTS_CSV_EXAMPLE_CONTENT = [
 ].join("\r\n");
 
 export type CsvStudentRow = {
+  /** Numéro de ligne dans le fichier (1 = en-têtes), pour des messages d'erreur exacts. */
+  line: number;
   id_interne: string | null;
   first_name: string;
   last_name: string;
@@ -88,7 +90,11 @@ export function parseStudentsCsv(text: string): {
     return { rows: [], errors };
   }
 
-  const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  // Numéros relevés avant d'écarter les lignes vides : ce sont ceux du fichier.
+  const lines = raw
+    .split(/\r?\n/)
+    .map((text, idx) => ({ text, no: idx + 1 }))
+    .filter((l) => l.text.trim().length > 0);
   if (lines.length < 2) {
     errors.push(
       "Le CSV doit contenir une ligne d’en-têtes et au moins une ligne de données.",
@@ -96,8 +102,8 @@ export function parseStudentsCsv(text: string): {
     return { rows: [], errors };
   }
 
-  const delim = detectDelimiter(lines[0]);
-  const headers = parseCsvLine(lines[0], delim).map(normHeader);
+  const delim = detectDelimiter(lines[0].text);
+  const headers = parseCsvLine(lines[0].text, delim).map(normHeader);
   const colIndex: Partial<Record<keyof CsvStudentRow, number>> = {};
 
   headers.forEach((h, i) => {
@@ -120,8 +126,8 @@ export function parseStudentsCsv(text: string): {
   const rows: CsvStudentRow[] = [];
 
   for (let li = 1; li < lines.length; li++) {
-    const cells = parseCsvLine(lines[li], delim);
-    const lineNo = li + 1;
+    const cells = parseCsvLine(lines[li].text, delim);
+    const lineNo = lines[li].no;
     const first_name = (cells[colIndex.first_name!] ?? "").trim();
     const last_name = (cells[colIndex.last_name!] ?? "").trim();
     const classRaw = (cells[colIndex.class_name!] ?? "").trim();
@@ -138,6 +144,7 @@ export function parseStudentsCsv(text: string): {
         ? (cells[colIndex.id_interne] ?? "").trim()
         : "";
     rows.push({
+      line: lineNo,
       id_interne: idRaw || null,
       first_name,
       last_name,

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SCHOOL_PLANS, TEACHER_PLANS } from "@/lib/plans";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -38,7 +39,7 @@ const faqItems = [
   },
   {
     q: "Y a-t-il une période d’essai ?",
-    a: "Enseignants : le pack Essentiel est gratuit (40 copies ou 30 jours, selon la première limite atteinte). Établissements : l’accès Évaluation offre 14 jours de démo avec jusqu’à 3 enseignants.",
+    a: `Enseignants : le pack Essentiel est gratuit (${TEACHER_PLANS.essential.copy_limit} copies ou ${TEACHER_PLANS.essential.access_days} jours, selon la première limite atteinte). Établissements : l’accès Évaluation offre ${SCHOOL_PLANS.evaluation.trial_days} jours de démo avec jusqu’à ${SCHOOL_PLANS.evaluation.max_teachers} enseignants.`,
   },
   {
     q: "Comment sont protégées les données ?",

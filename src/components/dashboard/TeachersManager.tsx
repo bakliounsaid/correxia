@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ListExportButton } from "@/components/ui/ListExportButton";
 import { TableSelectCheckbox } from "@/components/ui/TableSelectCheckbox";
 import { useRowSelection } from "@/hooks/useRowSelection";
+import { backendFetch } from "@/lib/backend";
 import { omitId } from "@/lib/utils";
 
 type TeacherRow = {
@@ -165,8 +166,8 @@ export function TeachersManager({ initialTeachers, classOptions }: Props) {
     try {
       const endpoint =
         mode === "add"
-          ? "/api/dashboard/school/teachers"
-          : `/api/dashboard/school/teachers/${editId}`;
+          ? "/school/teachers"
+          : `/school/teachers/${editId}`;
       const method = mode === "add" ? "POST" : "PATCH";
       const payload =
         mode === "add"
@@ -187,7 +188,7 @@ export function TeachersManager({ initialTeachers, classOptions }: Props) {
               classNames,
             };
 
-      const res = await fetch(endpoint, {
+      const res = await backendFetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -272,7 +273,7 @@ export function TeachersManager({ initialTeachers, classOptions }: Props) {
     setPendingAction("delete");
     setPendingRowId(row.id);
     try {
-      const res = await fetch(`/api/dashboard/school/teachers/${row.id}`, {
+      const res = await backendFetch(`/school/teachers/${row.id}`, {
         method: "DELETE",
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };

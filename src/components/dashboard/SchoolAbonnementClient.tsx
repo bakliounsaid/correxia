@@ -10,6 +10,7 @@ import {
   offerLabelFromPlan,
   type SchoolOffer,
 } from "@/lib/school-billing-plans";
+import { backendFetch } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 
 type SchoolRow = {
@@ -52,7 +53,7 @@ export function SchoolAbonnementClient({
 
   const verifySession = useCallback(
     async (sid: string) => {
-      const res = await fetch("/api/billing/school-checkout/verify", {
+      const res = await backendFetch("/billing/school-checkout/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: sid }),
@@ -89,7 +90,7 @@ export function SchoolAbonnementClient({
     setPaying(offer.id);
     setBanner(null);
     try {
-      const res = await fetch("/api/billing/school-checkout", {
+      const res = await backendFetch("/billing/school-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: offer.checkoutPlan }),

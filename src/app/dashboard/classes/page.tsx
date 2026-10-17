@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Users, BookOpen } from "lucide-react";
 import { ListExportButton } from "@/components/ui/ListExportButton";
+import { CreateClassButton } from "@/components/dashboard/CreateClassButton";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { subjectLabelFr } from "@/lib/dashboard-profile";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -44,6 +45,18 @@ export default async function ClassesPage() {
       .maybeSingle();
     schoolId = school?.id ?? null;
   }
+
+  // L'enseignant indépendant crée ses classes ; celles d'un établissement sont gérées par celui-ci.
+  const isIndependentTeacher =
+    !isSchoolAdmin && teacherId
+      ? (
+          await supabase
+            .from("teachers")
+            .select("is_independent")
+            .eq("id", teacherId)
+            .maybeSingle()
+        ).data?.is_independent === true
+      : false;
 
   const classIdsForTeacher = teacherId
     ? (
@@ -146,24 +159,33 @@ export default async function ClassesPage() {
             <p className="mt-1 text-gray-500">
               {isSchoolAdmin
                 ? "Chaque classe distincte de l’établissement apparaît ici."
-                : "Classes qui vous sont affectées via le pivot classes-enseignants."}
+                : isIndependentTeacher
+                  ? "Créez vos classes puis ajoutez-y vos élèves."
+                  : "Classes qui vous sont affectées par votre établissement."}
             </p>
           </div>
-          {classNames.length > 0 ? (
-            <ListExportButton
-              fileBaseName="classes"
-              sheetName="Classes"
-              columns={classExportColumns}
-              rows={classExportRows}
-            />
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {isIndependentTeacher ? <CreateClassButton /> : null}
+            {classNames.length > 0 ? (
+              <ListExportButton
+                fileBaseName="classes"
+                sheetName="Classes"
+                columns={classExportColumns}
+                rows={classExportRows}
+              />
+            ) : null}
+          </div>
         </div>
       </header>
 
       {classNames.length === 0 ? (
         <DashboardEmptyState
           title="Aucune classe"
-          message="Aucune classe disponible pour le moment."
+          message={
+            isIndependentTeacher
+              ? "Aucune classe pour le moment. Cliquez sur « Nouvelle classe » pour en créer une."
+              : "Aucune classe disponible pour le moment."
+          }
           icon={Users}
           accentClass="border-t-primary-500"
         />

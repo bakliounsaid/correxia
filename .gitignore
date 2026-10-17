@@ -41,6 +41,7 @@ backend/.env
 # python
 __pycache__/
 *.pyc
+.venv/
 
 # vercel
 .vercel

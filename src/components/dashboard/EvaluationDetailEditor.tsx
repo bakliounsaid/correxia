@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import { Button } from "@/components/ui/Button";
+import { backendFetch } from "@/lib/backend";
+import { toStoredQuestions } from "@/lib/evaluation-questions";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 export type EvaluationDetail = {
@@ -187,31 +189,19 @@ export function EvaluationDetailEditor({ evaluation }: Props) {
     }
     setBusy(true);
     try {
-      const res = await fetch(`/api/dashboard/evaluations/${data.id}`, {
+      const res = await backendFetch(`/evaluations/${data.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: (() => {
-          const questionsPayload = questions.map((q, idx) => ({
-            id: q.id || `exo-${idx + 1}`,
-            type: "open_question",
-            title: `Exercice ${idx + 1}`,
-            text: q.text,
-            points: Number(q.points || 0),
-          }));
-          const rubricPayload = questions.map((q, idx) => ({
-            id: `exo-${idx + 1}`,
-            label: `Exercice ${idx + 1}`,
-            points: Number(q.points || 0),
-          }));
-          const totalPoints = questions.reduce((sum, q) => sum + Number(q.points || 0), 0);
+          const stored = toStoredQuestions(questions.map((q) => ({ ...q, points: Number(q.points || 0) })));
           return JSON.stringify({
             title: title.trim(),
             subject: subject.trim(),
             class_name: className.trim(),
             duration_minutes: durationMinutes,
-            total_points: totalPoints,
-            questions: questionsPayload,
-            rubric: rubricPayload,
+            total_points: stored.totalPoints,
+            questions: stored.questions,
+            rubric: stored.rubric,
           });
         })(),
       });

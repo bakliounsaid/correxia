@@ -5,6 +5,7 @@ import { memo, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, Send } from "lucide-react";
 import Swal from "sweetalert2";
 import { Button } from "@/components/ui/Button";
+import { backendFetch } from "@/lib/backend";
 
 type Props = {
   evaluationId: string;
@@ -101,8 +102,8 @@ function CopyReviewWorkspaceInner(props: Props) {
   async function onValidate() {
     setSaving(true);
     try {
-      const res = await fetch(
-        `/api/dashboard/evaluations/${props.evaluationId}/copies/${props.copyId}/review`,
+      const res = await backendFetch(
+        `/evaluations/${props.evaluationId}/copies/${props.copyId}/review`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -272,6 +273,7 @@ function CopyReviewWorkspaceInner(props: Props) {
               )
             ) : isModal ? (
               <div className="absolute inset-2 overflow-auto sm:inset-3">
+                {/* eslint-disable-next-line @next/next/no-img-element -- scan Supabase zoomé : affiché tel quel, sans recompression next/image */}
                 <img
                   src={props.previewUrl}
                   alt="Copie élève"
@@ -282,6 +284,7 @@ function CopyReviewWorkspaceInner(props: Props) {
               </div>
             ) : (
               <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element -- scan Supabase zoomé : affiché tel quel, sans recompression next/image */}
                 <img
                   src={props.previewUrl}
                   alt="Copie élève"

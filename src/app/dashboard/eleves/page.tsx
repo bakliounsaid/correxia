@@ -1,10 +1,8 @@
 import { CircleUserRound } from "lucide-react";
-import {
-  StudentsManager,
-  type StudentRow,
-} from "@/components/dashboard/StudentsManager";
+import { StudentsManager } from "@/components/dashboard/StudentsManager";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { STUDENT_COLUMNS, toStudentRow } from "@/lib/students-data";
 import { getTeacherId } from "@/lib/teacher-context";
 
 export default async function ElevesPage() {
@@ -50,15 +48,18 @@ export default async function ElevesPage() {
   }
 
   let insertSchoolId: string | null = null;
+  // Élèves gérés par l'établissement pour ses enseignants ; l'enseignant indépendant gère les siens.
+  let canManageStudents = isSchoolAdmin;
   if (isSchoolAdmin) {
     insertSchoolId = schoolId;
   } else if (teacherId) {
     const { data: tr } = await supabase
       .from("teachers")
-      .select("school_id")
+      .select("school_id, is_independent")
       .eq("id", teacherId)
       .maybeSingle();
     insertSchoolId = tr?.school_id ?? null;
+    canManageStudents = tr?.is_independent === true;
   }
 
   let classOptions: { id: string; name: string }[] = [];
@@ -90,23 +91,12 @@ export default async function ElevesPage() {
     classIds.length > 0
       ? await supabase
           .from("students")
-          .select("id, first_name, last_name, id_interne, class_id, created_at, classes(name)")
+          .select(STUDENT_COLUMNS)
           .in("class_id", classIds)
           .order("last_name", { ascending: true })
       : { data: [] };
 
-  const list = (students ?? []).map((s) => {
-    const c = Array.isArray(s.classes) ? (s.classes[0] ?? null) : s.classes;
-    return {
-      id: s.id,
-      first_name: s.first_name,
-      last_name: s.last_name,
-      id_interne: s.id_interne ?? "",
-      class_id: s.class_id,
-      class_name: c?.name ?? "—",
-      created_at: s.created_at,
-    };
-  });
+  const list = (students ?? []).map(toStudentRow);
 
   return (
     <div className="p-6 lg:p-8">
@@ -124,10 +114,11 @@ export default async function ElevesPage() {
       </header>
 
       <StudentsManager
-        initialStudents={list as StudentRow[]}
+        initialStudents={list}
         viewerTeacherId={isSchoolAdmin ? null : teacherId}
         insertSchoolId={insertSchoolId}
         isSchoolAdmin={isSchoolAdmin}
+        canManage={canManageStudents}
         classOptions={classOptions}
       />
     </div>

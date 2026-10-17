@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Mail, Send } from "lucide-react";
+import { backendFetch } from "@/lib/backend";
 
 type RoleOption = "Enseignant" | "Responsable" | "Autres";
 
@@ -24,7 +25,7 @@ export function ContactSection() {
       const phone = (form.elements.namedItem("phone") as HTMLInputElement)?.value;
       const role = (form.elements.namedItem("role") as HTMLSelectElement)?.value as RoleOption;
 
-      const res = await fetch("/api/contact", {
+      const res = await backendFetch("/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

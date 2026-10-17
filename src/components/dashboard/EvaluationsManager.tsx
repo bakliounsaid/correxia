@@ -7,6 +7,7 @@ import Swal from "sweetalert2";
 import { ListExportButton } from "@/components/ui/ListExportButton";
 import { TableSelectCheckbox } from "@/components/ui/TableSelectCheckbox";
 import { useRowSelection } from "@/hooks/useRowSelection";
+import { backendFetch } from "@/lib/backend";
 import { omitId } from "@/lib/utils";
 
 export type EvaluationRow = {
@@ -82,7 +83,7 @@ export function EvaluationsManager({ initialRows }: Props) {
     if (!confirm.isConfirmed) return;
     setPendingDeleteId(row.id);
     try {
-      const res = await fetch(`/api/dashboard/evaluations/${row.id}`, {
+      const res = await backendFetch(`/evaluations/${row.id}`, {
         method: "DELETE",
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
